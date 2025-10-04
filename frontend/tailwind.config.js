@@ -7,7 +7,21 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        menlo: ["Menlo", "Monaco", "Courier New", "monospace"],
+        menlo: [
+          "ui-monospace",
+          "Menlo",
+          "Monaco",
+          "Cascadia Mono",
+          "Segoe UI Mono",
+          "Roboto Mono",
+          "Oxygen Mono",
+          "Ubuntu Monospace",
+          "Source Code Pro",
+          "Fira Mono",
+          "Droid Sans Mono",
+          "Courier New",
+          "monospace",
+        ],
       },
     },
   },

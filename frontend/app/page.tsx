@@ -11,7 +11,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#181A25] flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-[#181A25] flex flex-col items-center justify-center relative overflow-hidden font-menlo">
       {/* Logo at top left */}
       <div className="absolute top-8 left-8 z-10">
         <Image
