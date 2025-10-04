@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from app.integrations.trellis import trellis_service, TrellisOutput
+import logging
+import traceback
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trellis", tags=["trellis"])
 
 
@@ -37,6 +40,7 @@ async def generate_3d_asset(request: Generate3DRequest):
     - no_background_images: Preprocessed images (if return_no_background=True)
     """
     try:
+        logger.info(f"Generating 3D asset with images: {request.images}")
         output = trellis_service.generate_3d_asset(
             images=request.images,
             seed=request.seed,
@@ -53,7 +57,10 @@ async def generate_3d_asset(request: Generate3DRequest):
             slat_sampling_steps=request.slat_sampling_steps,
             slat_guidance_strength=request.slat_guidance_strength
         )
+        logger.info("Successfully generated 3D asset")
         return output
     except Exception as e:
+        logger.error(f"Error generating 3D asset: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate 3D asset: {str(e)}")
 
