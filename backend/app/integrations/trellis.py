@@ -1,6 +1,16 @@
 import replicate
-from typing import Optional, List
+from typing import Optional, List, TypedDict
 from app.core.config import settings
+
+
+class TrellisOutput(TypedDict, total=False):
+    """Output schema from Trellis model."""
+    model_file: str
+    color_video: str
+    gaussian_ply: str
+    normal_video: str
+    combined_video: str
+    no_background_images: List[str]
 
 
 class TrellisService:
@@ -25,7 +35,7 @@ class TrellisService:
         ss_guidance_strength: float = 7.5,
         slat_sampling_steps: int = 12,
         slat_guidance_strength: float = 3.0
-    ):
+    ) -> TrellisOutput:
         """
         Generate a 3D asset from input images using Trellis.
         
@@ -46,7 +56,13 @@ class TrellisService:
             slat_guidance_strength: Stage 2: Structured Latent Generation - Guidance Strength (0-10)
         
         Returns:
-            Output from Trellis model
+            TrellisOutput containing:
+                - model_file: GLB 3D model file URL (if generate_model=True)
+                - color_video: Color render video URL (if generate_color=True)
+                - gaussian_ply: Gaussian point cloud PLY file URL (if save_gaussian_ply=True)
+                - normal_video: Normal render video URL (if generate_normal=True)
+                - combined_video: Combined video URL
+                - no_background_images: List of preprocessed images without background (if return_no_background=True)
         """
         input_data = {
             "images": images,
