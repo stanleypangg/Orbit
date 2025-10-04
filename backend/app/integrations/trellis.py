@@ -30,19 +30,19 @@ class TrellisService:
     def generate_3d_asset(
         self,
         images: List[str],
-        seed: int = 0,
-        randomize_seed: bool = True,
-        texture_size: int = 1024,
-        mesh_simplify: float = 0.95,
+        seed: int = 1337,
+        randomize_seed: bool = False,
+        texture_size: int = 2048,
+        mesh_simplify: float = 0.96,
         generate_color: bool = True,
         generate_normal: bool = False,
-        generate_model: bool = False,
+        generate_model: bool = True,
         save_gaussian_ply: bool = False,
-        return_no_background: bool = False,
-        ss_sampling_steps: int = 12,
-        ss_guidance_strength: float = 7.5,
-        slat_sampling_steps: int = 12,
-        slat_guidance_strength: float = 3.0
+        return_no_background: bool = True,
+        ss_sampling_steps: int = 26,
+        ss_guidance_strength: float = 8.0,
+        slat_sampling_steps: int = 26,
+        slat_guidance_strength: float = 3.2
     ) -> TrellisOutput:
         """
         Generate a 3D asset from input images using Trellis.
@@ -77,6 +77,9 @@ class TrellisService:
             logger.info(f"REPLICATE_API_KEY from settings: {settings.REPLICATE_API_KEY[:10] if settings.REPLICATE_API_KEY else 'NOT SET'}...")
             logger.info(f"self.api_token: {self.api_token[:10] if self.api_token else 'NOT SET'}...")
             
+            logger.info("-" * 80)
+            logger.info("TRELLIS SERVICE - Preparing input data:")
+            
             input_data = {
                 "images": images,
                 "seed": seed,
@@ -93,6 +96,14 @@ class TrellisService:
                 "slat_sampling_steps": slat_sampling_steps,
                 "slat_guidance_strength": slat_guidance_strength
             }
+            
+            # Log all input parameters
+            for key, value in input_data.items():
+                if key == "images":
+                    logger.info(f"  {key}: {value[:100]}..." if isinstance(value, list) and len(str(value)) > 100 else f"  {key}: {value}")
+                else:
+                    logger.info(f"  {key}: {value}")
+            logger.info("-" * 80)
             
             # Create a client with the API token explicitly set
             client = replicate.Client(api_token=self.api_token)
