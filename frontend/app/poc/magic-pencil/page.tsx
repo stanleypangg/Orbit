@@ -275,9 +275,9 @@ export default function MagicPencilPage() {
           </p>
 
           {/* Main Canvas Area */}
-          <div className="border border-[#2A3142] rounded-lg bg-[#232937] p-8">
+          <div className="border border-[#67B68B] bg-[#2A3038] p-8">
             {/* Instruction */}
-            <div className="flex items-center gap-2 text-[#4ade80] text-sm mb-6">
+            <div className="flex items-center gap-2 text-[#4ade80] text-sm bg-[#2A3038] p-3 -mx-8 -mt-8 mb-6">
               <Image
                 src="/edit/tooltip.svg"
                 alt="Info"
@@ -293,7 +293,7 @@ export default function MagicPencilPage() {
             {/* Canvas Container */}
             <div
               ref={containerRef}
-              className="relative bg-[#2A3442] rounded-lg flex items-center justify-center"
+              className="relative bg-[#2A3038] flex items-center justify-center"
               style={{ minHeight: "400px", height: "500px" }}
             >
               {!uploadedImage ? (
@@ -331,96 +331,96 @@ export default function MagicPencilPage() {
 
             {/* Tools Bar */}
             {uploadedImage && (
-              <div className="mt-6 border border-[#4ade80] rounded-lg p-4 flex items-center justify-between bg-[#1E2433]">
-                <div className="flex items-center gap-4">
+              <div className="mt-6 bg-[#2D3642] border border-[#67B68B] px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-6">
                   {/* Undo/Redo */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button
                       onClick={undo}
                       disabled={historyIndex <= 0}
-                      className="w-12 h-12 border border-[#4ade80] rounded flex items-center justify-center hover:bg-[#2A3142] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="w-[50px] h-[50px] bg-[#3A4450] rounded flex items-center justify-center hover:bg-[#454D5A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Image
                         src="/edit/undo.svg"
                         alt="Undo"
-                        width={20}
-                        height={20}
+                        width={24}
+                        height={24}
                       />
                     </button>
                     <button
                       onClick={redo}
                       disabled={historyIndex >= history.length - 1}
-                      className="w-12 h-12 border border-[#4ade80] rounded flex items-center justify-center hover:bg-[#2A3142] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="w-[50px] h-[50px] bg-[#3A4450] rounded flex items-center justify-center hover:bg-[#454D5A] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Image
                         src="/edit/redo.svg"
                         alt="Redo"
-                        width={20}
-                        height={20}
+                        width={24}
+                        height={24}
                       />
                     </button>
                   </div>
 
                   {/* Tools */}
-                  <div className="flex gap-2 ml-4">
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setTool("pencil")}
-                      className={`w-16 h-16 border rounded flex items-center justify-center transition-colors ${
+                      className={`w-[90px] h-[90px] bg-[#3A4450] rounded-lg flex items-center justify-center transition-all ${
                         tool === "pencil"
-                          ? "border-[#4ade80] bg-[#2A3142]"
-                          : "border-[#4ade80] hover:bg-[#2A3142]"
+                          ? "ring-2 ring-[#4ade80]"
+                          : "hover:bg-[#454D5A]"
                       }`}
                     >
                       <Image
                         src="/edit/pencil.png"
                         alt="Pencil"
-                        width={32}
-                        height={32}
+                        width={50}
+                        height={50}
                       />
                     </button>
                     <button
                       onClick={() => setTool("eraser")}
-                      className={`w-16 h-16 border rounded flex items-center justify-center transition-colors ${
+                      className={`w-[90px] h-[90px] bg-[#3A4450] rounded-lg flex items-center justify-center transition-all ${
                         tool === "eraser"
-                          ? "border-[#4ade80] bg-[#2A3142]"
-                          : "border-[#4ade80] hover:bg-[#2A3142]"
+                          ? "ring-2 ring-[#4ade80]"
+                          : "hover:bg-[#454D5A]"
                       }`}
                     >
                       <Image
                         src="/edit/eraser.png"
                         alt="Eraser"
-                        width={32}
-                        height={32}
+                        width={50}
+                        height={50}
                       />
                     </button>
                     <button
                       onClick={() => setShowPrompt(!showPrompt)}
-                      className={`w-16 h-16 border rounded flex items-center justify-center transition-colors ${
+                      className={`w-[90px] h-[90px] bg-[#3A4450] rounded-lg flex items-center justify-center transition-all ${
                         showPrompt
-                          ? "border-[#4ade80] bg-[#2A3142]"
-                          : "border-[#4ade80] hover:bg-[#2A3142]"
+                          ? "ring-2 ring-[#4ade80]"
+                          : "hover:bg-[#454D5A]"
                       }`}
                     >
                       <Image
                         src="/edit/note.png"
                         alt="Note"
-                        width={32}
-                        height={32}
+                        width={50}
+                        height={50}
                       />
                     </button>
                   </div>
                 </div>
 
                 {/* Generate & Skip Buttons */}
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-2 items-end">
                   <button
                     onClick={handleGenerate}
                     disabled={isGenerating || !showPrompt || !prompt.trim()}
-                    className="px-8 py-3 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold rounded transition-colors uppercase"
+                    className="w-[280px] py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold rounded transition-colors uppercase tracking-wide"
                   >
                     {isGenerating ? "Generating..." : "Generate"}
                   </button>
-                  <button className="px-6 py-3 text-[#4ade80] hover:text-[#3bc970] font-semibold transition-colors uppercase underline">
+                  <button className="text-[#4ade80] hover:text-[#3bc970] font-medium transition-colors uppercase text-sm tracking-wide">
                     Skip
                   </button>
                 </div>
