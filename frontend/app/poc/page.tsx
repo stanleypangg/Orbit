@@ -237,6 +237,12 @@ export default function Home() {
           >
             Try Magic Pencil ✨ →
           </Link>
+          <Link
+            href="/poc/storyboard"
+            className="text-green-400 hover:text-green-300 font-semibold transition-colors"
+          >
+            Try Storyboard Generator 📋 →
+          </Link>
         </div>
 
         {/* Chat Container */}
@@ -455,6 +461,12 @@ export default function Home() {
           className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
         >
           Try Magic Pencil ✨ →
+        </Link>
+        <Link
+          href="/poc/storyboard"
+          className="text-green-400 hover:text-green-300 font-semibold transition-colors"
+        >
+          Try Storyboard Generator 📋 →
         </Link>
       </div>
 
