@@ -85,7 +85,7 @@ export default function TrellisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-8 font-menlo">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Trellis 3D Generator</h1>
 

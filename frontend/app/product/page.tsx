@@ -121,7 +121,7 @@ export default function ProductDetail() {
         {/* Product Header */}
         <div className="mb-8">
           <h1 className="text-4xl text-white mb-2">{productData.name}</h1>
-          <p className="text-[#4ade80] text-base">{productData.summary}</p>
+          <p className="text-[#67B68B] text-base">{productData.summary}</p>
         </div>
 
         {/* Top Section: Model Viewer + ESG Impact */}

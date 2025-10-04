@@ -106,9 +106,14 @@ export default function Home() {
       setAnimationPhase(6);
     }, 1900);
 
-    setTimeout(async () => {
-      // Phase 7: Animation complete, fetch AI response
+    setTimeout(() => {
+      // Phase 6.5: Show chat input after chat interface renders (2200ms)
       setAnimationPhase(7);
+    }, 2200);
+
+    setTimeout(async () => {
+      // Phase 8: Fetch AI response
+      setAnimationPhase(8);
       setIsGenerating(false);
 
       // Call Phase 1 API with the initial message
@@ -210,7 +215,7 @@ export default function Home() {
   if (isChatMode) {
     // Chat Interface
     return (
-      <div className="min-h-screen bg-[#181A25] flex flex-col overflow-hidden">
+      <div className="min-h-screen bg-[#181A25] flex flex-col overflow-hidden font-menlo">
         {/* Header */}
         <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
           <Image
@@ -237,7 +242,16 @@ export default function Home() {
         {/* Chat Container */}
         <div className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8">
           {/* Messages Area - This is the grown textarea transformed */}
-          <div className="flex-1 bg-[#232937] border border-[#4ade80] p-6 mb-4 overflow-y-auto">
+          <div
+            className="bg-[#232937] border border-[#4ade80] p-6 overflow-y-auto"
+            style={{
+              height:
+                animationPhase >= 7
+                  ? "calc(100vh - 280px)"
+                  : "calc(100vh - 200px)",
+              transition: "height 300ms ease-out",
+            }}
+          >
             <div className="space-y-4">
               {messages.map((message) => {
                 const shouldAnimate = animatedMessageIds.has(message.id);
@@ -382,11 +396,13 @@ export default function Home() {
 
           {/* Chat Input */}
           <div
-            className={`transition-all duration-500 ease-out ${
-              animationPhase >= 6
-                ? "translate-y-0 scale-100 opacity-100"
-                : "translate-y-full scale-95 opacity-0"
-            }`}
+            className="mt-4 transition-all duration-500 ease-out"
+            style={{
+              transform:
+                animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
+              opacity: animationPhase >= 7 ? 1 : 0,
+              pointerEvents: animationPhase >= 7 ? "auto" : "none",
+            }}
           >
             <div className="flex gap-3 items-end">
               <textarea
@@ -520,8 +536,8 @@ export default function Home() {
             className="transition-all duration-500 ease-out"
             style={{
               transform:
-                animationPhase >= 2 ? "translateY(150%)" : "translateY(0)",
-              opacity: animationPhase >= 2 ? 0 : 1,
+                animationPhase >= 1 ? "translateY(150%)" : "translateY(0)",
+              opacity: animationPhase >= 1 ? 0 : 1,
             }}
           >
             <button
