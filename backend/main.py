@@ -5,6 +5,7 @@ from app.endpoints.example.router import router as example_router
 from app.endpoints.redis.router import router as redis_router
 from app.endpoints.trellis.router import router as trellis_router
 from app.endpoints.chat.router import router as chat_router
+from app.endpoints.workflow.router import router as workflow_router
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +26,7 @@ app.include_router(example_router)
 app.include_router(redis_router)
 app.include_router(trellis_router)
 app.include_router(chat_router)
+app.include_router(workflow_router)
 
 @app.get("/")
 async def root():

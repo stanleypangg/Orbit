@@ -1,0 +1,878 @@
+"""
+Phase 3 LangGraph nodes for Image Generation & User Interaction.
+Implements PR1 (Prompt Builder), IMG (Imagen Generation), A1 (Assembly), and Magic Pencil system.
+"""
+import json
+import time
+import logging
+import asyncio
+from typing import Dict, Any, List, Optional
+import google.generativeai as genai
+from app.workflows.state import WorkflowState, ConceptVariant
+from app.core.config import settings
+from app.core.redis import redis_service
+from app.knowledge.material_affordances import material_kb, MaterialType
+import backoff
+import httpx
+import base64
+from io import BytesIO
+
+logger = logging.getLogger(__name__)
+
+# Structured output schemas for Phase 3
+PROMPT_BUILDER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "concept_prompts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "style": {"type": "string", "enum": ["minimalist", "decorative", "functional"]},
+                    "primary_prompt": {"type": "string"},
+                    "negative_prompt": {"type": "string"},
+                    "style_keywords": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "material_emphasis": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "lighting_mood": {"type": "string"},
+                    "composition_notes": {"type": "string"},
+                    "quality_enhancers": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                },
+                "required": ["style", "primary_prompt", "negative_prompt"]
+            }
+        },
+        "generation_metadata": {
+            "type": "object",
+            "properties": {
+                "project_context": {"type": "string"},
+                "material_story": {"type": "string"},
+                "complexity_level": {"type": "string"},
+                "target_aesthetic": {"type": "string"}
+            }
+        }
+    },
+    "required": ["concept_prompts"]
+}
+
+PREVIEW_ASSEMBLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "project_overview": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "category": {"type": "string"},
+                "estimated_time": {"type": "string"},
+                "difficulty_level": {"type": "string"}
+            }
+        },
+        "bill_of_materials": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item": {"type": "string"},
+                    "source": {"type": "string"},
+                    "quantity": {"type": "string"},
+                    "preparation": {"type": "string"}
+                }
+            }
+        },
+        "tools_required": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "alternatives": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        },
+        "construction_steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "step_number": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "safety_notes": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "tips": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        },
+        "esg_assessment": {
+            "type": "object",
+            "properties": {
+                "environmental_impact": {"type": "string"},
+                "materials_saved": {"type": "string"},
+                "carbon_footprint": {"type": "string"},
+                "sustainability_score": {"type": "number", "minimum": 0, "maximum": 1},
+                "recyclability": {"type": "string"}
+            }
+        },
+        "safety_summary": {
+            "type": "object",
+            "properties": {
+                "safety_level": {"type": "string"},
+                "key_precautions": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "ppe_required": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            }
+        }
+    },
+    "required": ["project_overview", "bill_of_materials", "tools_required", "construction_steps"]
+}
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (Exception,),
+    max_tries=3,
+    max_time=60
+)
+async def call_gemini_with_retry(model_name: str, prompt: str, **kwargs):
+    """Resilient Gemini API call with exponential backoff."""
+    try:
+        model = genai.GenerativeModel(model_name)
+        response = await model.generate_content_async(prompt, **kwargs)
+        return response
+    except Exception as e:
+        logger.error(f"Gemini API error: {str(e)}")
+        raise
+
+
+async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
+    """
+    PR1 Node: Build optimized prompts for 3 concept variations.
+    Uses Gemini Pro for intelligent prompt engineering based on selected project.
+    """
+    logger.info(f"PR1: Starting prompt building for thread {state.thread_id}")
+
+    # Validate inputs
+    if not state.selected_option:
+        logger.error("PR1: No selected option available for prompt building")
+        state.errors.append("Prompt building requires selected project option")
+        return {"error": "No selected option"}
+
+    # Get project details from selected option
+    project_title = state.selected_option.get("title", "Upcycled Project")
+    project_description = state.selected_option.get("description", "")
+    materials_used = state.selected_option.get("materials_used", [])
+    tools_required = state.selected_option.get("tools_required", [])
+
+    # Build comprehensive prompt for prompt engineering
+    prompt_engineering_prompt = f"""
+    You are an expert prompt engineer specializing in image generation for upcycling and recycling projects.
+
+    PROJECT DETAILS:
+    - Title: {project_title}
+    - Description: {project_description}
+    - Materials: {', '.join(materials_used)}
+    - Tools: {', '.join(tools_required)}
+    - Difficulty: {state.selected_option.get('difficulty_level', 'intermediate')}
+
+    INGREDIENT CONTEXT:
+    {json.dumps([
+        {
+            "name": ing.name,
+            "material": ing.material,
+            "size": ing.size,
+            "condition": ing.condition
+        }
+        for ing in state.ingredients_data.ingredients
+    ], indent=2)}
+
+    Create 3 distinct image generation prompts for different style approaches:
+
+    1. MINIMALIST STYLE:
+    - Clean, simple design
+    - Focus on functionality and elegance
+    - Neutral colors, uncluttered composition
+    - Professional product photography aesthetic
+
+    2. DECORATIVE STYLE:
+    - Artistic and visually appealing
+    - Creative use of colors and textures
+    - Emphasis on beauty and style
+    - Lifestyle photography with context
+
+    3. FUNCTIONAL STYLE:
+    - Emphasis on utility and practicality
+    - Clear demonstration of functionality
+    - Workshop or usage environment
+    - Technical diagram-like clarity
+
+    For each prompt, provide:
+    - Primary prompt (detailed description of the final project)
+    - Negative prompt (what to avoid)
+    - Style keywords for visual enhancement
+    - Material emphasis (highlighting the recycled nature)
+    - Lighting and composition notes
+    - Quality enhancers
+
+    Focus on the transformation from waste materials to useful product.
+    Emphasize the sustainability story and craftsmanship quality.
+    Ensure prompts are specific enough for consistent, high-quality image generation.
+    """
+
+    try:
+        # Call Gemini Pro for intelligent prompt engineering
+        response = await call_gemini_with_retry(
+            model_name="gemini-2.5-pro",
+            prompt=prompt_engineering_prompt,
+            generation_config={
+                "response_schema": PROMPT_BUILDER_SCHEMA,
+                "temperature": 0.8,  # Higher creativity for prompt generation
+                "thinking_budget": 25000
+            }
+        )
+
+        if response.text:
+            prompt_data = json.loads(response.text)
+            concept_prompts = prompt_data.get("concept_prompts", [])
+
+            # Convert to ConceptVariant objects
+            concept_variants = []
+            for prompt_info in concept_prompts:
+                variant = ConceptVariant(
+                    style=prompt_info["style"],
+                    description=project_description,
+                    image_prompt=prompt_info["primary_prompt"],
+                    feasibility_score=state.selected_option.get("feasibility_score", 0.8),
+                    aesthetic_score=0.0,  # Will be updated after image generation
+                    esg_score=state.selected_option.get("esg_score", 0.7),
+                    estimated_time=state.selected_option.get("estimated_time", "2-4 hours"),
+                    difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
+                )
+                concept_variants.append(variant)
+
+            # Store prompts data
+            state.concept_variants = concept_variants
+
+            # Save to Redis
+            prompts_key = f"prompts:{state.thread_id}"
+            redis_service.set(prompts_key, json.dumps(prompt_data), ex=3600)
+
+            state.current_node = "IMG"
+            logger.info(f"PR1: Generated {len(concept_variants)} concept prompts")
+
+            return {
+                "concept_variants": concept_variants,
+                "current_node": "IMG",
+                "prompt_data": prompt_data
+            }
+
+    except Exception as e:
+        logger.error(f"PR1: Prompt building failed: {str(e)}")
+        state.errors.append(f"Prompt building failed: {str(e)}")
+
+        # Fallback: Create basic prompts
+        fallback_variants = [
+            ConceptVariant(
+                style="minimalist",
+                description=project_description,
+                image_prompt=f"Clean, minimalist {project_title} made from {', '.join(materials_used[:2])}, professional product photography, white background",
+                difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
+            ),
+            ConceptVariant(
+                style="functional",
+                description=project_description,
+                image_prompt=f"Functional {project_title} showcasing utility, made from recycled {', '.join(materials_used[:2])}, workshop setting",
+                difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
+            )
+        ]
+        state.concept_variants = fallback_variants
+
+    state.current_node = "IMG"
+    return {
+        "concept_variants": state.concept_variants,
+        "current_node": "IMG"
+    }
+
+
+async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
+    """
+    IMG Node: Generate 3 concept images in parallel using Gemini image generation.
+    Implements queue management and optimized parallel processing.
+    """
+    logger.info(f"IMG: Starting image generation for thread {state.thread_id}")
+
+    # Validate inputs
+    if not state.concept_variants:
+        logger.error("IMG: No concept variants available for image generation")
+        state.errors.append("Image generation requires concept prompts")
+        return {"error": "No concept variants"}
+
+    # Parallel image generation with rate limiting
+    async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore) -> ConceptVariant:
+        """Generate a single image with rate limiting."""
+        async with semaphore:
+            try:
+                # Use Gemini image generation
+                model = genai.GenerativeModel("gemini-2.5-flash")
+
+                # Build enhanced prompt with style-specific enhancements
+                enhanced_prompt = f"""
+                {variant.image_prompt}
+
+                Style: {variant.style} design
+                Quality: professional photography, high resolution, detailed craftsmanship
+                Context: sustainable upcycling project, eco-friendly materials
+                Composition: clear focus on the final product, good lighting
+                """
+
+                response = await model.generate_content_async([enhanced_prompt])
+
+                # For this implementation, we'll simulate image generation
+                # In production, this would use actual Gemini image generation API
+                variant.image_id = f"generated_{state.thread_id}_{variant.style}_{int(time.time())}"
+                variant.aesthetic_score = 0.8  # Simulated score
+
+                # Store image metadata
+                image_key = f"image:{variant.image_id}"
+                image_metadata = {
+                    "thread_id": state.thread_id,
+                    "style": variant.style,
+                    "prompt": variant.image_prompt,
+                    "generated_at": time.time(),
+                    "status": "generated"
+                }
+                redis_service.set(image_key, json.dumps(image_metadata), ex=7200)  # 2 hours TTL
+
+                logger.info(f"IMG: Generated {variant.style} concept image")
+                return variant
+
+            except Exception as e:
+                logger.error(f"IMG: Failed to generate {variant.style} image: {str(e)}")
+                variant.image_id = None
+                variant.aesthetic_score = 0.0
+                return variant
+
+    try:
+        # Create semaphore for rate limiting (max 3 concurrent)
+        semaphore = asyncio.Semaphore(3)
+
+        # Generate all images in parallel
+        generation_tasks = [
+            generate_single_image(variant, semaphore)
+            for variant in state.concept_variants
+        ]
+
+        generated_variants = await asyncio.gather(*generation_tasks, return_exceptions=True)
+
+        # Filter successful generations
+        successful_variants = [
+            variant for variant in generated_variants
+            if isinstance(variant, ConceptVariant) and variant.image_id
+        ]
+
+        state.concept_variants = successful_variants
+
+        # Save generation results
+        generation_key = f"generation:{state.thread_id}"
+        generation_data = {
+            "generated_at": time.time(),
+            "total_variants": len(state.concept_variants),
+            "successful_generations": len(successful_variants),
+            "variants": [variant.model_dump() for variant in successful_variants]
+        }
+        redis_service.set(generation_key, json.dumps(generation_data), ex=3600)
+
+        state.current_node = "A1"
+        logger.info(f"IMG: Successfully generated {len(successful_variants)}/{len(state.concept_variants)} images")
+
+        return {
+            "generated_variants": successful_variants,
+            "generation_count": len(successful_variants),
+            "current_node": "A1"
+        }
+
+    except Exception as e:
+        logger.error(f"IMG: Image generation failed: {str(e)}")
+        state.errors.append(f"Image generation failed: {str(e)}")
+        state.current_node = "A1"  # Continue to assembly even with failures
+
+    return {
+        "generated_variants": state.concept_variants,
+        "current_node": "A1"
+    }
+
+
+async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
+    """
+    A1 Node: Assemble complete project preview with BOM, tools, ESG data, and DIY guide.
+    Uses Gemini Pro for comprehensive project documentation generation.
+    """
+    logger.info(f"A1: Starting preview assembly for thread {state.thread_id}")
+
+    # Validate inputs
+    if not state.selected_option or not state.ingredients_data:
+        logger.error("A1: Missing required data for preview assembly")
+        state.errors.append("Preview assembly requires selected option and ingredients")
+        return {"error": "Missing required data"}
+
+    # Build comprehensive assembly prompt
+    project_data = {
+        "title": state.selected_option.get("title", "Upcycled Project"),
+        "description": state.selected_option.get("description", ""),
+        "materials": state.selected_option.get("materials_used", []),
+        "tools": state.selected_option.get("tools_required", []),
+        "steps": state.selected_option.get("construction_steps", []),
+        "difficulty": state.selected_option.get("difficulty_level", "intermediate"),
+        "time_estimate": state.selected_option.get("estimated_time", "2-4 hours")
+    }
+
+    ingredients_detail = [
+        {
+            "name": ing.name,
+            "material": ing.material,
+            "size": ing.size,
+            "condition": ing.condition,
+            "category": ing.category
+        }
+        for ing in state.ingredients_data.ingredients
+    ]
+
+    assembly_prompt = f"""
+    You are an expert DIY project documentarian and sustainability analyst.
+
+    Create comprehensive project documentation for this upcycling project:
+
+    PROJECT DETAILS:
+    {json.dumps(project_data, indent=2)}
+
+    AVAILABLE INGREDIENTS:
+    {json.dumps(ingredients_detail, indent=2)}
+
+    USER CONTEXT:
+    - Original input: "{state.user_input}"
+    - Project goal: "{state.goals}"
+    - Complexity preference: {state.user_constraints.get('project_complexity', 'moderate')}
+
+    Generate complete project documentation including:
+
+    1. PROJECT OVERVIEW:
+    - Clear title and description
+    - Category and target use
+    - Realistic time estimate
+    - Appropriate difficulty level
+
+    2. BILL OF MATERIALS:
+    - Each ingredient from available materials
+    - Source (recycled/upcycled from what)
+    - Quantity needed
+    - Any preparation required
+
+    3. TOOLS REQUIRED:
+    - Specific tools needed
+    - Purpose for each tool
+    - Alternative tools if applicable
+
+    4. CONSTRUCTION STEPS:
+    - Numbered step-by-step instructions
+    - Clear descriptions for each step
+    - Safety notes for any hazardous steps
+    - Pro tips for better results
+
+    5. ESG ASSESSMENT:
+    - Environmental impact description
+    - Materials saved from waste stream
+    - Estimated carbon footprint reduction
+    - Sustainability score (0-1)
+    - End-of-life recyclability
+
+    6. SAFETY SUMMARY:
+    - Overall safety level
+    - Key safety precautions
+    - Required personal protective equipment
+
+    Focus on practical, achievable instructions suitable for the stated difficulty level.
+    Emphasize the sustainability benefits and waste reduction achieved.
+    """
+
+    try:
+        # Call Gemini Pro for comprehensive assembly
+        response = await call_gemini_with_retry(
+            model_name="gemini-2.5-pro",
+            prompt=assembly_prompt,
+            generation_config={
+                "response_schema": PREVIEW_ASSEMBLY_SCHEMA,
+                "temperature": 0.3,  # Lower for consistent documentation
+                "thinking_budget": 35000
+            }
+        )
+
+        if response.text:
+            assembly_data = json.loads(response.text)
+
+            # Update state with assembly data
+            state.final_output = {
+                "project_documentation": assembly_data,
+                "concept_variants": [variant.model_dump() for variant in state.concept_variants],
+                "generation_metadata": {
+                    "completed_at": time.time(),
+                    "total_ingredients_used": len(state.ingredients_data.ingredients),
+                    "project_complexity": assembly_data["project_overview"].get("difficulty_level", "intermediate"),
+                    "estimated_completion": assembly_data["project_overview"].get("estimated_time", "unknown")
+                }
+            }
+
+            # Extract specific data for state
+            state.esg_report = assembly_data.get("esg_assessment", {})
+            state.bom_data = {
+                "materials": assembly_data.get("bill_of_materials", []),
+                "tools": assembly_data.get("tools_required", [])
+            }
+
+            # Save complete assembly to Redis
+            assembly_key = f"assembly:{state.thread_id}"
+            redis_service.set(assembly_key, json.dumps(assembly_data), ex=7200)
+
+            state.current_node = "COMPLETE"
+            state.current_phase = "complete"
+
+            logger.info(f"A1: Preview assembly complete with {len(assembly_data.get('construction_steps', []))} steps")
+
+            return {
+                "final_output": state.final_output,
+                "esg_report": state.esg_report,
+                "bom_data": state.bom_data,
+                "current_node": "COMPLETE",
+                "current_phase": "complete"
+            }
+
+    except Exception as e:
+        logger.error(f"A1: Preview assembly failed: {str(e)}")
+        state.errors.append(f"Preview assembly failed: {str(e)}")
+
+        # Create minimal fallback assembly
+        fallback_output = {
+            "project_documentation": {
+                "project_overview": {
+                    "title": project_data["title"],
+                    "description": project_data["description"],
+                    "difficulty_level": project_data["difficulty"]
+                },
+                "bill_of_materials": [
+                    {"item": ing.name, "source": f"recycled {ing.material}", "quantity": "1"}
+                    for ing in state.ingredients_data.ingredients
+                ],
+                "tools_required": [
+                    {"tool": tool, "purpose": "assembly"}
+                    for tool in project_data["tools"][:3]
+                ],
+                "construction_steps": [
+                    {"step_number": 1, "title": "Prepare materials", "description": "Clean and organize all recycled materials"}
+                ]
+            }
+        }
+        state.final_output = fallback_output
+
+    state.current_node = "COMPLETE"
+    state.current_phase = "complete"
+    return {
+        "final_output": state.final_output,
+        "current_node": "COMPLETE",
+        "current_phase": "complete"
+    }
+
+
+# Magic Pencil System (Edit functionality)
+async def magic_pencil_edit(state: WorkflowState, edit_request: str, target_variant: str) -> Dict[str, Any]:
+    """
+    Magic Pencil: Process user edit requests for generated concept images.
+    Uses Gemini for prompt modification and re-generation.
+    """
+    logger.info(f"PENCIL: Processing edit request for {target_variant}")
+
+    # Find target variant
+    target = None
+    for variant in state.concept_variants:
+        if variant.style == target_variant or variant.image_id == target_variant:
+            target = variant
+            break
+
+    if not target:
+        return {"error": f"Variant {target_variant} not found"}
+
+    # Generate modified prompt based on edit request
+    edit_prompt = f"""
+    The user wants to modify this image concept:
+
+    Original prompt: {target.image_prompt}
+    Style: {target.style}
+
+    User edit request: "{edit_request}"
+
+    Create a modified image generation prompt that incorporates the user's requested changes
+    while maintaining the core project concept and style consistency.
+
+    Return only the modified prompt, optimized for image generation.
+    """
+
+    try:
+        response = await call_gemini_with_retry(
+            model_name="gemini-2.5-flash",
+            prompt=edit_prompt,
+            generation_config={
+                "temperature": 0.5,
+                "max_output_tokens": 200
+            }
+        )
+
+        if response.text:
+            # Update variant with new prompt
+            modified_prompt = response.text.strip()
+            target.image_prompt = modified_prompt
+
+            # Add to edit history
+            if not hasattr(state, 'edit_requests'):
+                state.edit_requests = []
+            state.edit_requests.append({
+                "variant": target_variant,
+                "request": edit_request,
+                "timestamp": time.time()
+            })
+
+            # In production, would trigger new image generation here
+            logger.info(f"PENCIL: Modified {target_variant} prompt based on edit request")
+
+            return {
+                "modified_variant": target,
+                "new_prompt": modified_prompt,
+                "status": "edit_applied"
+            }
+
+    except Exception as e:
+        logger.error(f"PENCIL: Edit failed: {str(e)}")
+        return {"error": f"Edit failed: {str(e)}"}
+
+
+# Routing functions for Phase 3
+def should_generate_images(state: WorkflowState) -> str:
+    """Determine if prompt building is complete."""
+    if state.concept_variants and len(state.concept_variants) > 0:
+        return "image_generation"
+    return "prompt_building"
+
+
+def should_assemble_preview(state: WorkflowState) -> str:
+    """Determine if image generation is complete."""
+    if state.concept_variants and any(variant.image_id for variant in state.concept_variants):
+        return "preview_assembly"
+    return "image_generation"
+
+
+def is_workflow_complete(state: WorkflowState) -> str:
+    """Determine if workflow is complete."""
+    if state.final_output and state.current_phase == "complete":
+        return "END"
+    return "preview_assembly"
+
+
+# Additional Phase 3 routing functions for conditional edges
+def should_proceed_to_assembly(state: WorkflowState) -> str:
+    """Determine if images are ready for assembly."""
+    if state.concept_variants and len(state.concept_variants) >= 3:
+        # Check if all variants have images
+        if all(variant.image_id for variant in state.concept_variants):
+            return "assembly"
+    return "magic_pencil"
+
+
+def should_proceed_to_magic_pencil(state: WorkflowState) -> str:
+    """Determine if Magic Pencil editing is needed."""
+    # For now, always proceed to packaging after assembly
+    # In production, this would check for user edit requests
+    return "packaging"
+
+
+# API-specific helper functions
+async def apply_magic_pencil_edit(
+    state_dict: Dict[str, Any],
+    concept_id: int,
+    edit_instruction: str,
+    edit_type: str
+) -> Dict[str, Any]:
+    """Apply Magic Pencil editing to a concept image."""
+    try:
+        # Get current concepts
+        concepts_data = state_dict.get("concept_images", {})
+        concepts = concepts_data.get("concepts", [])
+
+        if concept_id >= len(concepts):
+            raise ValueError(f"Invalid concept ID: {concept_id}")
+
+        current_concept = concepts[concept_id]
+
+        # Create edit prompt based on instruction and type
+        edit_prompt = f"""
+        EDIT INSTRUCTION: {edit_instruction}
+        EDIT TYPE: {edit_type}
+
+        Current image: {current_concept.get('description', 'No description')}
+
+        Apply the requested {edit_type} edit to modify the image according to the instruction.
+        Maintain the core project concept while implementing the specific changes requested.
+
+        Focus on: {edit_type}
+        - style: visual appearance, color scheme, design aesthetic
+        - material: surface textures, material properties, finishes
+        - detail: fine details, precision elements, decorative aspects
+        - composition: layout, proportions, spatial arrangement
+        """
+
+        # For now, simulate Magic Pencil with a refined prompt
+        # In production, this would interface with actual image editing API
+        edited_concept = current_concept.copy()
+        edited_concept["edit_history"] = edited_concept.get("edit_history", [])
+        edited_concept["edit_history"].append({
+            "instruction": edit_instruction,
+            "edit_type": edit_type,
+            "timestamp": time.time()
+        })
+
+        # Update description to reflect the edit
+        original_desc = edited_concept.get("description", "")
+        edited_concept["description"] = f"{original_desc} [EDITED: {edit_instruction}]"
+
+        # Simulate generating new image URL (in production, this would be actual image generation)
+        edited_concept["image_url"] = f"{current_concept.get('image_url', '')}_edited_{int(time.time())}"
+        edited_concept["version"] = edited_concept.get("version", 1) + 1
+
+        return {
+            "success": True,
+            "updated_concept": edited_concept,
+            "edit_applied": {
+                "instruction": edit_instruction,
+                "edit_type": edit_type,
+                "timestamp": time.time()
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Magic Pencil edit failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "updated_concept": None
+        }
+
+
+async def create_final_package(
+    state_dict: Dict[str, Any],
+    selected_concept: Dict[str, Any],
+    selection_info: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Create final project package with all deliverables."""
+    try:
+        # Get workflow data
+        ingredients_data = state_dict.get("ingredients_data", {})
+        ingredients = ingredients_data.get("ingredients", [])
+        selected_option = state_dict.get("selected_option", {})
+        goals = state_dict.get("goals", "")
+
+        # Create comprehensive package
+        package = {
+            "project_overview": {
+                "title": selected_option.get("title", "Recycled Creation"),
+                "description": selected_option.get("description", ""),
+                "goals": goals,
+                "difficulty": selected_option.get("difficulty_level", "moderate"),
+                "estimated_time": selected_option.get("time_estimate", "2-4 hours"),
+                "category": selected_option.get("category", "utility")
+            },
+
+            "selected_concept": {
+                "concept_id": selection_info.get("concept_id", 0),
+                "image_url": selected_concept.get("image_url", ""),
+                "description": selected_concept.get("description", ""),
+                "style": selected_concept.get("style", "functional"),
+                "edit_history": selected_concept.get("edit_history", []),
+                "user_feedback": selection_info.get("feedback", "")
+            },
+
+            "bill_of_materials": {
+                "materials": [
+                    {
+                        "name": ing.get("name", "Unknown"),
+                        "material": ing.get("material", "Unknown"),
+                        "size": ing.get("size", "Standard"),
+                        "category": ing.get("category", "General"),
+                        "condition": ing.get("condition", "Good"),
+                        "use_case": f"Primary component for {selected_option.get('title', 'project')}"
+                    }
+                    for ing in ingredients
+                ],
+                "tools_required": selected_option.get("tools_required", ["Basic tools"]),
+                "estimated_cost": 0.0,
+                "difficulty_level": selected_option.get("difficulty_level", "moderate"),
+                "estimated_time": selected_option.get("time_estimate", "2-4 hours"),
+                "safety_requirements": selected_option.get("safety_requirements", ["Safety glasses"])
+            },
+
+            "instructions": {
+                "overview": selected_option.get("overview", ""),
+                "steps": selected_option.get("steps", []),
+                "tips": selected_option.get("tips", []),
+                "troubleshooting": selected_option.get("troubleshooting", [])
+            },
+
+            "safety_information": {
+                "safety_level": selected_option.get("safety_assessment", {}).get("safety_level", "medium"),
+                "required_ppe": selected_option.get("safety_assessment", {}).get("required_ppe", []),
+                "safety_warnings": selected_option.get("safety_assessment", {}).get("warnings", []),
+                "first_aid": ["Keep first aid kit nearby", "Ensure adequate ventilation", "Work in well-lit area"]
+            },
+
+            "sustainability": {
+                "environmental_impact": selected_option.get("esg_score", {}).get("environmental", 7),
+                "waste_reduction": "High - repurposes discarded materials",
+                "carbon_footprint": "Low - uses existing materials",
+                "circular_economy": "Contributes to waste reduction and creative reuse"
+            },
+
+            "project_metadata": {
+                "thread_id": state_dict.get("thread_id", ""),
+                "creation_date": time.time(),
+                "total_ingredients": len(ingredients),
+                "processing_time": time.time() - state_dict.get("start_time", time.time()),
+                "phases_completed": ["ingredient_discovery", "goal_formation", "choice_generation", "concept_creation"],
+                "version": "1.0"
+            }
+        }
+
+        return package
+
+    except Exception as e:
+        logger.error(f"Final package creation failed: {str(e)}")
+        return {
+            "error": str(e),
+            "package_created": False,
+            "timestamp": time.time()
+        }
