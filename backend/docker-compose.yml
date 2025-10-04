@@ -11,4 +11,6 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - GRPC_VERBOSITY=ERROR
+      - GRPC_PYTHON_LOG_LEVEL=ERROR
 
