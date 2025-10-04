@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Next.js App",
-  description: "Next.js application",
+  title: "Orbit",
+  description: "Orbit - AI-powered workspace",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased font-menlo">{children}</body>
     </html>
   );
 }
