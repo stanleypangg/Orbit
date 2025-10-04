@@ -75,6 +75,19 @@ class GeminiStructuredClient:
         if not model_config:
             model_config = GeminiModelConfig()
 
+        # Debug: Log schema details
+        logger.debug(f"Schema type: {type(response_schema)}")
+        logger.debug(f"Schema keys: {list(response_schema.keys()) if isinstance(response_schema, dict) else 'N/A'}")
+        
+        # Check for unhashable types in schema
+        try:
+            schema_json = json.dumps(response_schema, indent=2)
+            logger.debug(f"Schema JSON serialization: SUCCESS ({len(schema_json)} chars)")
+        except TypeError as e:
+            logger.error(f"Schema contains unhashable types: {e}")
+            logger.error(f"Problematic schema structure: {response_schema}")
+            raise GeminiStructuredError(f"Invalid schema structure: {e}")
+
         # Prepare generation config
         generation_config = {
             "temperature": model_config.temperature,
@@ -85,6 +98,7 @@ class GeminiStructuredClient:
         if model_config.use_structured_output:
             generation_config["response_mime_type"] = "application/json"
             generation_config["response_schema"] = response_schema
+            logger.debug(f"Using structured output with schema (type={response_schema.get('type', 'unknown')})")
 
         # Prepare model kwargs
         model_kwargs = {
@@ -95,11 +109,17 @@ class GeminiStructuredClient:
 
         if system_instruction:
             model_kwargs["system_instruction"] = system_instruction
+            logger.debug(f"System instruction: {system_instruction[:100]}...")
+
+        logger.info(f"Initializing Gemini model: {model_config.model_name}")
 
         for attempt in range(self.retry_config["max_retries"]):
             try:
+                logger.debug(f"Attempt {attempt + 1}/{self.retry_config['max_retries']}: Creating GenerativeModel...")
+                
                 # Create model
                 model = genai.GenerativeModel(**model_kwargs)
+                logger.debug("GenerativeModel created successfully")
 
                 # Generate content
                 if model_config.use_structured_output:

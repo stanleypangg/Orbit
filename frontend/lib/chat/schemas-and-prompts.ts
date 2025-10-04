@@ -1,7 +1,7 @@
 // schemas-and-prompts.ts
 
 // ---------------
-// 0) Your exact INGREDIENT_SCHEMA (unchanged)
+// Base INGREDIENT_SCHEMA (unchanged)
 // ---------------
 export const INGREDIENT_SCHEMA = {
   type: "object",
@@ -23,6 +23,27 @@ export const INGREDIENT_SCHEMA = {
     },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     needs_clarification: { type: "boolean" }
+  },
+  required: ["ingredients", "confidence", "needs_clarification"]
+} as const;
+
+// ---------------
+// Requirements Loop Schema
+// ---------------
+export const REQUIREMENTS_SCHEMA = {
+  type: "object",
+  properties: {
+    ingredients: INGREDIENT_SCHEMA.properties.ingredients,
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    needs_clarification: { type: "boolean" },
+    clarifying_questions: {
+      type: "array",
+      items: { type: "string" }
+    },
+    assumptions: {
+      type: "array",
+      items: { type: "string" }
+    }
   },
   required: ["ingredients", "confidence", "needs_clarification"]
 } as const;
@@ -62,7 +83,79 @@ export const PHASE1_SCHEMA = {
 } as const;
 
 // ---------------
-// 2) Phase-2 Imaging Brief schema (for the image loop)
+// Ideation Drafts Schema
+// ---------------
+export const IDEATION_DRAFTS_SCHEMA = {
+  type: "object",
+  properties: {
+    drafts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          one_liner: { type: "string" },
+          assumptions: {
+            type: "array",
+            items: { type: "string" }
+          },
+          draft_image: {
+            type: "object",
+            properties: {
+              url: { type: "string" },
+              seed: { type: ["number", "null"] },
+              notes: { type: "string" }
+            }
+          }
+        },
+        required: ["id", "name", "one_liner"]
+      },
+      minItems: 3,
+      maxItems: 3
+    }
+  },
+  required: ["drafts"]
+} as const;
+
+// ---------------
+// Refined Brief Schema
+// ---------------
+export const REFINED_BRIEF_SCHEMA = {
+  type: "object",
+  properties: {
+    idea_id: { type: "string" },
+    prompt: { type: "string" },
+    negative_prompt: { type: "string" },
+    camera: {
+      type: "object",
+      properties: {
+        view: { type: "string", enum: ["front", "three-quarter", "top", "detail"] }
+      },
+      required: ["view"]
+    },
+    lighting: { type: "string" },
+    background: { type: "string" },
+    render: {
+      type: "object",
+      properties: {
+        count: { type: "integer", minimum: 1, maximum: 1 },
+        aspect_ratio: { type: "string" },
+        image_size: { type: "string" },
+        seed: { type: ["integer", "null"] }
+      },
+      required: ["count", "aspect_ratio", "image_size"]
+    },
+    acceptance_criteria: {
+      type: "array",
+      items: { type: "string" }
+    }
+  },
+  required: ["idea_id", "prompt", "camera", "render"]
+} as const;
+
+// ---------------
+// 2) Phase-2 Imaging Brief schema (Legacy - for backward compatibility)
 // ---------------
 export const IMAGING_BRIEF_SCHEMA = {
   type: "object",
@@ -109,8 +202,50 @@ export const IMAGING_BRIEF_SCHEMA = {
 } as const;
 
 // ---------------
-// 3) System prompts
+// System prompts
 // ---------------
+
+export const REQUIREMENTS_SYSTEM_PROMPT = `
+You extract DIY requirements and fill a standardized ingredients schema.
+Output ONLY valid JSON that matches the provided responseSchema.
+
+Rules:
+1) Populate "ingredients" from user text. Keep strings short and literal.
+2) If any essential field is unknown:
+   - If it is safe to infer and confidence ≥ 0.6, fill it and add a plain-language entry to "assumptions".
+   - If it is safety-related or confidence < 0.6, set "needs_clarification": true and include up to 3 concise "clarifying_questions".
+3) Set an overall "confidence" in [0,1].
+4) No commentary outside fields.
+`.trim();
+
+export const IDEATION_SYSTEM_PROMPT = `
+You propose 3 distinct DIY ideas and return general, less-refined imaging briefs for each. Output ONLY valid JSON.
+
+Rules:
+1) Ideas must be materially faithful to PROJECT_CONTEXT.ingredients.
+2) Return:
+   {
+     "drafts": [{ "id","name","one_liner","assumptions":[] }, x3],
+     "imaging_briefs": [{
+       "draft_id","prompt","negative_prompt",
+       "render":{"count":1,"aspect_ratio":"1:1"},
+       "notes":"why this view helps"
+     }, x3]
+   }
+3) Keep prompts general and literal. Do not over-style. These are visual aids.
+4) No commentary outside JSON.
+`.trim();
+
+export const REFINED_BRIEF_SYSTEM_PROMPT = `
+You create ONE refined brief for the selected idea. Output ONLY valid JSON.
+
+Rules:
+1) Use PROJECT_CONTEXT (including chosen_idea) to produce a crisp, reproducible prompt that matches the materials.
+2) Provide camera, lighting, background, render, and acceptance_criteria as short fields.
+3) Keep seed null unless reproducibility is requested.
+`.trim();
+
+// Legacy system prompts (for backward compatibility)
 export const PHASE1_SYSTEM_PROMPT = `
 You extract DIY upcycling requirements and propose ideas.
 Output ONLY valid JSON that follows the provided responseSchema.
