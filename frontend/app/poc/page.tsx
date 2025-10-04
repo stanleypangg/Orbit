@@ -91,7 +91,7 @@ export default function Home() {
         <button
           onClick={handleGenerate}
           disabled={!prompt.trim() || isGenerating}
-          className="w-full bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold py-5 rounded-lg transition-colors uppercase tracking-wider text-base"
+          className="w-full bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 transition-colors uppercase text-base"
         >
           {isGenerating ? "GENERATING..." : "GENERATE"}
         </button>
@@ -99,7 +99,7 @@ export default function Home() {
 
       {/* Examples Section */}
       <div className="pb-16 max-w-8xl px-16 mx-auto">
-        <h2 className="text-[#4ade80] text-base mb-8 font-mono">
+        <h2 className="text-[#4ade80] text-base mb-4 font-mono">
           Try these examples
         </h2>
         <div className="flex justify-between">
