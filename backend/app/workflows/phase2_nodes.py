@@ -214,7 +214,6 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
             generation_config={
                 "response_schema": GOAL_FORMATION_SCHEMA,
                 "temperature": 0.5,  # Balanced creativity and consistency
-                "thinking_budget": 30000  # Allow thorough analysis
             }
         )
 
@@ -330,7 +329,6 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
             generation_config={
                 "response_schema": CHOICE_GENERATION_SCHEMA,
                 "temperature": 0.7,  # Higher creativity for ideation
-                "thinking_budget": 40000  # Allow extensive creative thinking
             }
         )
 

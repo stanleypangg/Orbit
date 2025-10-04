@@ -2,10 +2,16 @@ import os
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from typing import Optional
+from typing import Optional, List
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Prefer production settings when available, fall back to default
+dotenv_path = Path(".env.production")
+if dotenv_path.exists():
+    load_dotenv(dotenv_path)
+else:
+    load_dotenv()
 
 class Settings(BaseSettings):
     # API settings

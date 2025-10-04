@@ -103,6 +103,8 @@ class WorkflowState(BaseModel):
     concept_variants: List[ConceptVariant] = Field(default_factory=list)
     selected_concept: Optional[ConceptVariant] = None
     edit_requests: List[str] = Field(default_factory=list)
+    concept_images: Optional[Dict[str, Any]] = None
+    project_preview: Optional[Dict[str, Any]] = None
 
     # Output assembly (Phase 4)
     final_output: Optional[Dict[str, Any]] = None

@@ -32,12 +32,12 @@ INGREDIENT_SCHEMA = {
                     "material": {"type": ["string", "null"]},
                     "category": {"type": ["string", "null"]},
                     "condition": {"type": ["string", "null"]},
-                    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                    "confidence": {"type": "number"}
                 },
                 "required": ["name", "size", "material"]
             }
         },
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number"},
         "needs_clarification": {"type": "boolean"}
     },
     "required": ["ingredients", "confidence", "needs_clarification"]
@@ -59,6 +59,54 @@ async def call_gemini_with_retry(model_name: str, prompt: str, **kwargs):
     except Exception as e:
         logger.error(f"Gemini API error: {str(e)}")
         raise
+
+
+async def call_ai_agent(prompt: str, task_type: str = "default", response_schema=None, **kwargs):
+    """
+    Universal AI agent caller - uses production client when available,
+    falls back to development client.
+    """
+    if USE_PRODUCTION_CLIENT:
+        # Use production client with our enhanced features
+        try:
+            result = await call_gemini_with_retry(
+                prompt=prompt,
+                task_type=task_type,
+                response_schema=response_schema
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Production client failed: {str(e)}, falling back to development")
+
+    # Fallback to development client
+    model_name = kwargs.get('model_name', 'gemini-2.5-flash')
+    generation_config = kwargs.get('generation_config', {})
+
+    if response_schema:
+        generation_config['response_schema'] = response_schema
+
+    # Create proper model for fallback
+    model = genai.GenerativeModel(
+        model_name=model_name,
+        generation_config=generation_config,
+        safety_settings={
+            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        }
+    )
+
+    response = await model.generate_content_async(prompt, stream=False)
+
+    # Convert to production client format
+    if hasattr(response, 'text') and response.text:
+        if response_schema:
+            return json.loads(response.text)
+        else:
+            return {"text": response.text}
+
+    return {"text": ""}
 
 
 def save_ingredients_to_redis(thread_id: str, ingredients_data: IngredientsData) -> bool:
@@ -307,8 +355,8 @@ async def ingredient_categorizer_node(state: WorkflowState) -> Dict[str, Any]:
                             "material": {"type": "string"},
                             "category": {"type": "string"},
                             "condition": {"type": "string"},
-                            "recyclability": {"type": "number", "minimum": 0, "maximum": 1},
-                            "upcycling_potential": {"type": "number", "minimum": 0, "maximum": 1}
+                            "recyclability": {"type": "number"},
+                            "upcycling_potential": {"type": "number"}
                         },
                         "required": ["name", "material", "category"]
                     }
@@ -317,7 +365,7 @@ async def ingredient_categorizer_node(state: WorkflowState) -> Dict[str, Any]:
                     "type": "object",
                     "properties": {
                         "suitable_for_upcycling": {"type": "boolean"},
-                        "material_synergy": {"type": "number", "minimum": 0, "maximum": 1},
+                        "material_synergy": {"type": "number"},
                         "project_complexity": {"type": "string", "enum": ["simple", "moderate", "complex"]},
                         "recommended_project_types": {"type": "array", "items": {"type": "string"}}
                     }
