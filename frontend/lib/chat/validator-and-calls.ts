@@ -69,7 +69,7 @@ export async function callPhase2(payload: {
 
 // ---------- Chatbot-friendly handlers (minimal) ----------
 
-export async function handlePhase1(input: string) {
+ export async function handlePhase1(input: string) {
   const raw = await callPhase1(input);
   const v = validateJson<typeof raw>(raw, "phase1");
   if (v.ok) return v.value;

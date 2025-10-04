@@ -39,7 +39,7 @@ def get_structured_client() -> GeminiStructuredClient:
 # Phase 1 Schemas
 # ---------------
 
-INGREDIENT_SCHEMA = {
+PHASE1_SCHEMA = {
     "type": "object",
     "properties": {
         "ingredients": {
@@ -47,26 +47,18 @@ INGREDIENT_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": ["string", "null"]},
-                    "size": {"type": ["string", "null"]},
-                    "material": {"type": ["string", "null"]},
-                    "category": {"type": ["string", "null"]},
-                    "condition": {"type": ["string", "null"]},
-                    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                    "name": {"type": "string"},
+                    "size": {"type": "string"},
+                    "material": {"type": "string"},
+                    "category": {"type": "string"},
+                    "condition": {"type": "string"},
+                    "confidence": {"type": "number"}
                 },
-                "required": ["name", "size", "material"]
+                "required": ["name", "material"]
             }
         },
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "needs_clarification": {"type": "boolean"}
-    },
-    "required": ["ingredients", "confidence", "needs_clarification"]
-}
-
-PHASE1_SCHEMA = {
-    "type": "object",
-    "properties": {
-        **INGREDIENT_SCHEMA["properties"],
+        "confidence": {"type": "number"},
+        "needs_clarification": {"type": "boolean"},
         "clarifying_questions": {
             "type": "array",
             "items": {"type": "string"}
@@ -81,12 +73,10 @@ PHASE1_SCHEMA = {
                     "one_liner": {"type": "string"}
                 },
                 "required": ["id", "title", "one_liner"]
-            },
-            "minItems": 3,
-            "maxItems": 5
+            }
         }
     },
-    "required": [*INGREDIENT_SCHEMA["required"], "ideas"]
+    "required": ["ingredients", "confidence", "needs_clarification", "ideas"]
 }
 
 PHASE1_SYSTEM_PROMPT = """
@@ -114,12 +104,11 @@ IMAGING_BRIEF_SCHEMA = {
         "camera": {
             "type": "object",
             "properties": {
-                "view": {"type": "string", "enum": ["front", "three-quarter", "top", "detail"]},
+                "view": {"type": "string"},
                 "focal_length_mm": {"type": "number"},
                 "aperture_f": {"type": "number"},
                 "distance_m": {"type": "number"}
-            },
-            "required": ["view"]
+            }
         },
         "lighting": {"type": "string"},
         "background": {"type": "string"},
@@ -134,12 +123,11 @@ IMAGING_BRIEF_SCHEMA = {
         "render": {
             "type": "object",
             "properties": {
-                "aspect_ratio": {"type": "string", "enum": ["1:1", "4:3", "3:4", "16:9", "9:16"]},
-                "image_size": {"type": "string", "enum": ["1K", "2K"]},
-                "count": {"type": "integer", "minimum": 1, "maximum": 4},
-                "seed": {"type": ["integer", "null"]}
-            },
-            "required": ["aspect_ratio", "count"]
+                "aspect_ratio": {"type": "string"},
+                "image_size": {"type": "string"},
+                "count": {"type": "integer"},
+                "seed": {"type": "integer"}
+            }
         },
         "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
         "assumptions": {"type": "array", "items": {"type": "string"}},
