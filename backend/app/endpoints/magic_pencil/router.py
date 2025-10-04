@@ -46,7 +46,7 @@ async def edit_image(request: MagicPencilRequest):
         # Step 1: Download images
         original_response = requests.get(request.original_image_url, timeout=10)
         drawn_response = requests.get(request.drawn_overlay_url, timeout=10)
-        
+         
         original_image = Image.open(io.BytesIO(original_response.content)).convert("RGBA")
         drawn_overlay = Image.open(io.BytesIO(drawn_response.content)).convert("RGBA")
         

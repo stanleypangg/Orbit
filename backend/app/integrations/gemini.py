@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.core.config import settings
 import logging
 import traceback
@@ -6,6 +7,7 @@ from typing import Optional
 from PIL import Image
 import io
 import requests
+import os
 import base64
 
 logger = logging.getLogger(__name__)
@@ -14,12 +16,11 @@ logger = logging.getLogger(__name__)
 class GeminiImageEditor:
     def __init__(self):
         if settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            logger.info("Gemini Image Editor initialized")
+            self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+            logger.info("Gemini Image Editor initialized with Nano Banana client")
         else:
             logger.warning("No Gemini API key found")
-            self.model = None
+            self.client = None
     
     def create_magic_pencil_system_prompt(self, user_prompt: str) -> str:
         """
@@ -75,7 +76,7 @@ Return a single edited image where:
         user_prompt: str
     ) -> Optional[str]:
         """
-        Edit an image using Gemini Nano Banana with Magic Pencil workflow.
+        Edit an image using Gemini Nano Banana (gemini-2.5-flash-image).
         
         Args:
             original_image_b64: Base64 of reference image (must be preserved)
@@ -87,50 +88,80 @@ Return a single edited image where:
             Base64 data URL of edited image or None if failed
         """
         try:
-            if not self.model:
-                raise Exception("Gemini model not initialized")
+            if not self.client:
+                raise Exception("Gemini client not initialized")
             
-            # Create the comprehensive system prompt
+            logger.info("Calling Gemini Nano Banana (gemini-2.5-flash-image)")
+            logger.info(f"User prompt: {user_prompt}")
+            
+            # Decode base64 to bytes for inline_data
+            original_bytes = base64.b64decode(original_image_b64)
+            drawn_bytes = base64.b64decode(drawn_overlay_b64)
+            mask_bytes = base64.b64decode(pure_mask_b64)
+            
+            # Create the comprehensive prompt with all context
             system_prompt = self.create_magic_pencil_system_prompt(user_prompt)
             
-            logger.info("Calling Gemini Nano Banana for Magic Pencil editing")
-            logger.info(f"System prompt length: {len(system_prompt)} chars")
+            # Simplified prompt for Nano Banana
+            # The model name maps to gemini-2.5-flash-preview-image internally
+            simple_prompt = f"""Edit this image based on the mask and prompt.
+
+IMAGES:
+1. Original image (preserve areas where mask is black)
+2. Drawn overlay (shows edit areas in red)
+3. Binary mask (white = edit, black = preserve)
+
+TASK: {user_prompt}
+
+Generate the edited image with changes ONLY in white mask areas."""
+
+            # Call Gemini API with Nano Banana format
+            # Note: This model may require paid tier access
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash-image",
+                contents=[
+                    simple_prompt,
+                    types.Part.from_bytes(data=original_bytes, mime_type="image/png"),
+                    types.Part.from_bytes(data=drawn_bytes, mime_type="image/png"),
+                    types.Part.from_bytes(data=mask_bytes, mime_type="image/png")
+                ]
+            )
             
-            # Decode base64 back to PIL Images for Gemini API
-            import base64
-            original_image = Image.open(io.BytesIO(base64.b64decode(original_image_b64)))
-            drawn_overlay = Image.open(io.BytesIO(base64.b64decode(drawn_overlay_b64)))
-            pure_mask = Image.open(io.BytesIO(base64.b64decode(pure_mask_b64)))
+            logger.info("Received response from Gemini")
+            logger.info(f"Response type: {type(response)}")
+            logger.info(f"Response dir: {dir(response)}")
             
-            # Call Gemini API with all 4 inputs
-            # Note: This is the structure for Gemini's multimodal API
-            response = self.model.generate_content([
-                system_prompt,
-                "Reference Image (preserve this exactly outside mask):",
-                original_image,
-                "Drawn Overlay (shows user's red markings):",
-                drawn_overlay,
-                "Pure Mask (white = edit area, black = preserve):",
-                pure_mask,
-                f"User's edit request: {user_prompt}",
-                "Generate the edited image following all constraints above."
-            ])
+            # Debug: Log the full response structure
+            if hasattr(response, 'candidates'):
+                logger.info(f"Candidates: {response.candidates}")
+                if response.candidates and len(response.candidates) > 0:
+                    candidate = response.candidates[0]
+                    logger.info(f"First candidate: {candidate}")
+                    logger.info(f"Candidate dir: {dir(candidate)}")
+                    
+                    if hasattr(candidate, 'content'):
+                        logger.info(f"Content: {candidate.content}")
+                        if candidate.content and hasattr(candidate.content, 'parts'):
+                            logger.info(f"Parts: {candidate.content.parts}")
+                            
+                            # Extract image from response (Nano Banana format)
+                            if candidate.content.parts:
+                                for part in candidate.content.parts:
+                                    logger.info(f"Part type: {type(part)}, has text: {hasattr(part, 'text')}, has inline_data: {hasattr(part, 'inline_data')}")
+                                    if hasattr(part, 'text') and part.text is not None:
+                                        logger.info(f"Gemini text response: {part.text[:200]}...")
+                                    elif hasattr(part, 'inline_data') and part.inline_data is not None:
+                                        logger.info("Found generated image in response")
+                                        # Convert to base64 data URL
+                                        image_b64 = base64.b64encode(part.inline_data.data).decode()
+                                        return f"data:image/png;base64,{image_b64}"
             
-            # Extract image from response
-            # TODO: Adjust based on actual Gemini response format
-            if hasattr(response, 'parts'):
-                for part in response.parts:
-                    if hasattr(part, 'inline_data'):
-                        # Image response
-                        img_data = part.inline_data.data
-                        return f"data:image/png;base64,{base64.b64encode(img_data).decode()}"
-            
-            logger.warning("No image found in Gemini response")
-            logger.info(f"Response: {str(response)[:200]}")
+            logger.warning("No image found in Gemini response - response structure unexpected")
+            logger.warning(f"Full response: {str(response)[:500]}")
             return None
             
         except Exception as e:
-            logger.error(f"Error calling Gemini: {str(e)}")
+            logger.error(f"Error calling Gemini Nano Banana: {str(e)}")
             logger.error(traceback.format_exc())
             return None
 
