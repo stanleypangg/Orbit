@@ -958,3 +958,27 @@ async def finalize_workflow(thread_id: str, concept_id: int):
         # Store error
         error_key = f"workflow_error:{thread_id}"
         redis_service.set(error_key, json.dumps({"error": str(e), "phase": "finalization"}), ex=3600)
+
+
+async def track_share_analytics(thread_id: str, platform: str):
+    """Track sharing analytics in background."""
+    try:
+        # Record sharing analytics
+        analytics_key = f"share_analytics:{thread_id}:{platform}"
+        analytics_data = {
+            "thread_id": thread_id,
+            "platform": platform,
+            "shared_at": time.time(),
+            "source": "ai_generator",
+            "campaign": "user_project_share"
+        }
+
+        redis_service.set(analytics_key, json.dumps(analytics_data), ex=86400)
+
+        # Update aggregate sharing stats
+        daily_key = f"daily_shares:{time.strftime('%Y-%m-%d')}"
+        redis_service.incr(daily_key, 1)
+        redis_service.expire(daily_key, 86400 * 30)  # Keep for 30 days
+
+    except Exception as e:
+        logger.error(f"Failed to track share analytics: {str(e)}")

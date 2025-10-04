@@ -5,7 +5,7 @@ Implements the complete state machine with interrupt/resume patterns.
 import logging
 from typing import Dict, Any
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph_checkpoint_redis import RedisSaver
 from app.workflows.state import WorkflowState
 from app.workflows.nodes import (
     ingredient_extraction_node,

@@ -104,7 +104,7 @@ class MaterialAffordanceKnowledgeBase:
                     MaterialType.PLASTIC, MaterialType.WOOD, MaterialType.RUBBER
                 ],
                 incompatible_materials=[
-                    MaterialType.STEEL  # Galvanic corrosion risk
+                    MaterialType.METAL  # Galvanic corrosion risk
                 ],
                 safety_level=SafetyLevel.CAUTION,
                 safety_notes=[
