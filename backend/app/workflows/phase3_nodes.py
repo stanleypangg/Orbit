@@ -10,10 +10,10 @@ from typing import Dict, Any, List, Optional
 import os
 import google.generativeai as genai
 from app.workflows.state import WorkflowState, ConceptVariant
+from app.ai_service.production_gemini import call_gemini_with_retry as production_call_gemini
 from app.core.config import settings
 from app.core.redis import redis_service
 from app.knowledge.material_affordances import material_kb, MaterialType
-import backoff
 import httpx
 import base64
 from io import BytesIO
@@ -127,7 +127,7 @@ PREVIEW_ASSEMBLY_SCHEMA = {
                 "environmental_impact": {"type": "string"},
                 "materials_saved": {"type": "string"},
                 "carbon_footprint": {"type": "string"},
-                "sustainability_score": {"type": "number", "minimum": 0, "maximum": 1},
+                "sustainability_score": {"type": "number"},
                 "recyclability": {"type": "string"}
             }
         },
@@ -155,34 +155,6 @@ if settings.GEMINI_API_KEY:
 elif os.getenv("GOOGLE_API_KEY"):
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-GEMINI_AVAILABLE = True
-
-
-@backoff.on_exception(
-    backoff.constant,
-    (Exception,),
-    max_tries=1,
-    interval=0
-)
-async def call_gemini_with_retry(model_name: str, prompt: str, **kwargs):
-    """Resilient Gemini API call with exponential backoff."""
-    global GEMINI_AVAILABLE
-
-    if not GEMINI_AVAILABLE:
-        raise RuntimeError("Gemini offline mode active")
-
-    try:
-        model = genai.GenerativeModel(model_name)
-        # Ensure network-bound call does not hang indefinitely in offline environments
-        response = await asyncio.wait_for(
-            model.generate_content_async(prompt, **kwargs),
-            timeout=5
-        )
-        return response
-    except Exception as e:
-        logger.error(f"Gemini API error: {str(e)}")
-        GEMINI_AVAILABLE = False
-        raise
 
 
 async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
@@ -195,8 +167,12 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate inputs
     if not state.selected_option:
         logger.error("PR1: No selected option available for prompt building")
-        state.errors.append("Prompt building requires selected project option")
-        return {"error": "No selected option"}
+        message = "Prompt building requires selected project option"
+        state.errors.append(message)
+        return {
+            "errors": state.errors,
+            "current_node": "PR1"
+        }
 
     # Get project details from selected option
     project_title = state.selected_option.get("title", "Upcycled Project")
@@ -261,17 +237,14 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
 
     try:
         # Call Gemini Pro for intelligent prompt engineering
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-pro",
+        response = await production_call_gemini(
             prompt=prompt_engineering_prompt,
-            generation_config={
-                "response_schema": PROMPT_BUILDER_SCHEMA,
-                "temperature": 0.8,  # Higher creativity for prompt generation
-            }
+            task_type="creative",
+            response_schema=PROMPT_BUILDER_SCHEMA
         )
 
-        if response.text:
-            prompt_data = json.loads(response.text)
+        if response and not response.get("error"):
+            prompt_data = response  # Response is already parsed JSON
             concept_prompts = prompt_data.get("concept_prompts", [])
 
             # Convert to ConceptVariant objects
@@ -350,15 +323,16 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
     if not state.concept_variants:
         logger.error("IMG: No concept variants available for image generation")
         state.errors.append("Image generation requires concept prompts")
-        return {"error": "No concept variants"}
+        return {
+            "errors": state.errors,
+            "current_node": "IMG"
+        }
 
     # Parallel image generation with rate limiting
     async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore) -> ConceptVariant:
         """Generate a single image with rate limiting."""
         async with semaphore:
             try:
-                if not GEMINI_AVAILABLE:
-                    raise RuntimeError("Gemini offline mode active")
                 # Use Gemini image generation
                 model = genai.GenerativeModel("gemini-2.5-flash")
 
@@ -499,8 +473,12 @@ async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate inputs
     if not state.selected_option or not state.ingredients_data:
         logger.error("A1: Missing required data for preview assembly")
-        state.errors.append("Preview assembly requires selected option and ingredients")
-        return {"error": "Missing required data"}
+        message = "Preview assembly requires selected option and ingredients"
+        state.errors.append(message)
+        return {
+            "errors": state.errors,
+            "current_node": "A1"
+        }
 
     # Build comprehensive assembly prompt
     project_data = {
@@ -583,17 +561,14 @@ async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
 
     try:
         # Call Gemini Pro for comprehensive assembly
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-pro",
+        response = await production_call_gemini(
             prompt=assembly_prompt,
-            generation_config={
-                "response_schema": PREVIEW_ASSEMBLY_SCHEMA,
-                "temperature": 0.3,  # Lower for consistent documentation
-            }
+            task_type="analysis",
+            response_schema=PREVIEW_ASSEMBLY_SCHEMA
         )
 
-        if response.text:
-            assembly_data = json.loads(response.text)
+        if response and not response.get("error"):
+            assembly_data = response  # Response is already parsed JSON
 
             # Update state with assembly data
             state.project_preview = assembly_data
@@ -766,18 +741,14 @@ async def magic_pencil_edit(state: WorkflowState, edit_request: str, target_vari
     """
 
     try:
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-flash",
+        response = await production_call_gemini(
             prompt=edit_prompt,
-            generation_config={
-                "temperature": 0.5,
-                "max_output_tokens": 200
-            }
+            task_type="creative",
         )
 
-        if response.text:
+        if response.get("text"):
             # Update variant with new prompt
-            modified_prompt = response.text.strip()
+            modified_prompt = response["text"].strip()
             target.image_prompt = modified_prompt
 
             # Add to edit history

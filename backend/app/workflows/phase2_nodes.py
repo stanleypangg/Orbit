@@ -6,16 +6,58 @@ import json
 import time
 import logging
 from typing import Dict, Any, List, Optional
-import google.generativeai as genai
+from google.generativeai.types import protos as genai_protos
 from app.workflows.state import WorkflowState, ConceptVariant
+from app.ai_service.production_gemini import call_gemini_with_retry as production_call_gemini
+
 from app.core.config import settings
 from app.core.redis import redis_service
-import backoff
 
 logger = logging.getLogger(__name__)
 
 # Structured output schemas for Phase 2
-GOAL_FORMATION_SCHEMA = {
+_UNSUPPORTED_SCHEMA_KEYS = {
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+}
+
+
+def _sanitize_response_schema(schema: Any) -> Any:
+    """Normalize response schema definitions for Gemini structured output."""
+    if isinstance(schema, genai_protos.Schema):
+        return schema
+
+    if isinstance(schema, dict):
+        sanitized: Dict[str, Any] = {}
+        for key, value in schema.items():
+            if key in _UNSUPPORTED_SCHEMA_KEYS:
+                continue
+            if key == "type" and isinstance(value, list):
+                null_types = [t for t in value if isinstance(t, str) and t.lower() == "null"]
+                non_null_types = [t for t in value if isinstance(t, str) and t.lower() != "null"]
+                if len(non_null_types) == 1 and null_types:
+                    sanitized["type"] = non_null_types[0]
+                    sanitized.setdefault("nullable", True)
+                    continue
+
+            sanitized[key] = _sanitize_response_schema(value)
+        return sanitized
+
+    if isinstance(schema, list):
+        return [_sanitize_response_schema(item) for item in schema]
+
+    return schema
+
+
+GOAL_FORMATION_SCHEMA = _sanitize_response_schema({
     "type": "object",
     "properties": {
         "primary_goal": {"type": "string"},
@@ -41,9 +83,9 @@ GOAL_FORMATION_SCHEMA = {
         }
     },
     "required": ["primary_goal", "artifact_type", "project_complexity"]
-}
+})
 
-CHOICE_GENERATION_SCHEMA = {
+CHOICE_GENERATION_SCHEMA = _sanitize_response_schema({
     "type": "object",
     "properties": {
         "viable_options": {
@@ -69,8 +111,8 @@ CHOICE_GENERATION_SCHEMA = {
                     },
                     "estimated_time": {"type": "string"},
                     "difficulty_level": {"type": "string", "enum": ["beginner", "intermediate", "advanced"]},
-                    "innovation_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "practicality_score": {"type": "number", "minimum": 0, "maximum": 1}
+                    "innovation_score": {"type": "number"},
+                    "practicality_score": {"type": "number"}
                 },
                 "required": ["option_id", "title", "description", "materials_used"]
             }
@@ -80,15 +122,15 @@ CHOICE_GENERATION_SCHEMA = {
             "properties": {
                 "total_options": {"type": "integer"},
                 "generation_strategy": {"type": "string"},
-                "material_utilization": {"type": "number", "minimum": 0, "maximum": 1},
-                "creativity_score": {"type": "number", "minimum": 0, "maximum": 1}
+                "material_utilization": {"type": "number"},
+                "creativity_score": {"type": "number"}
             }
         }
     },
     "required": ["viable_options"]
-}
+})
 
-EVALUATION_SCHEMA = {
+EVALUATION_SCHEMA = _sanitize_response_schema({
     "type": "object",
     "properties": {
         "evaluated_options": {
@@ -97,12 +139,12 @@ EVALUATION_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "option_id": {"type": "string"},
-                    "feasibility_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "aesthetic_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "esg_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "safety_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "innovation_score": {"type": "number", "minimum": 0, "maximum": 1},
-                    "overall_score": {"type": "number", "minimum": 0, "maximum": 1},
+                    "feasibility_score": {"type": "number"},
+                    "aesthetic_score": {"type": "number"},
+                    "esg_score": {"type": "number"},
+                    "safety_score": {"type": "number"},
+                    "innovation_score": {"type": "number"},
+                    "overall_score": {"type": "number"},
                     "safety_flags": {
                         "type": "array",
                         "items": {"type": "string"}
@@ -137,24 +179,9 @@ EVALUATION_SCHEMA = {
         }
     },
     "required": ["evaluated_options", "safety_assessment"]
-}
+})
 
 
-@backoff.on_exception(
-    backoff.expo,
-    (Exception,),
-    max_tries=3,
-    max_time=60
-)
-async def call_gemini_with_retry(model_name: str, prompt: str, **kwargs):
-    """Resilient Gemini API call with exponential backoff."""
-    try:
-        model = genai.GenerativeModel(model_name)
-        response = await model.generate_content_async(prompt, **kwargs)
-        return response
-    except Exception as e:
-        logger.error(f"Gemini API error: {str(e)}")
-        raise
 
 
 async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
@@ -167,8 +194,12 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate that we have ingredient data
     if not state.ingredients_data or not state.ingredients_data.ingredients:
         logger.error("G1: No ingredient data available for goal formation")
-        state.errors.append("Goal formation requires complete ingredient data")
-        return {"error": "No ingredients available"}
+        message = "Goal formation requires complete ingredient data"
+        state.errors.append(message)
+        return {
+            "errors": state.errors,
+            "current_node": "G1"
+        }
 
     # Build goal formation prompt
     ingredients_summary = []
@@ -208,57 +239,80 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
 
     try:
         # Call Gemini Pro for complex goal reasoning
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-pro",
+        response = await production_call_gemini(
             prompt=goal_prompt,
-            generation_config={
-                "response_schema": GOAL_FORMATION_SCHEMA,
-                "temperature": 0.5,  # Balanced creativity and consistency
-            }
+            task_type="goal_formation",
+            response_schema=GOAL_FORMATION_SCHEMA
         )
 
-        if response.text:
-            goal_data = json.loads(response.text)
+        if response and not response.get("error"):
+            goal_data = response  # Response is already parsed JSON
 
-            # Update state with goal information
-            state.goals = goal_data["primary_goal"]
-            state.artifact_type = goal_data["artifact_type"]
-            state.user_constraints.update({
-                "project_complexity": goal_data["project_complexity"],
-                "estimated_time": goal_data.get("estimated_time", "unknown"),
-                "target_audience": goal_data.get("target_audience", "general"),
-                "functional_requirements": goal_data.get("functional_requirements", []),
-                "aesthetic_preferences": goal_data.get("aesthetic_preferences", "practical"),
-                "sustainability_focus": goal_data.get("sustainability_focus", True),
-                "budget_category": goal_data.get("budget_category", "minimal"),
-                "tool_complexity": goal_data.get("tool_complexity", "basic"),
-                "safety_considerations": goal_data.get("safety_considerations", []),
-                "success_metrics": goal_data.get("success_metrics", [])
-            })
+            if goal_data and goal_data.get("primary_goal") and goal_data.get("artifact_type"):
+                # SUCCESS PATH: Valid goal data
+                state.goals = goal_data["primary_goal"]
+                state.artifact_type = goal_data["artifact_type"]
+                state.user_constraints.update({
+                    "project_complexity": goal_data.get("project_complexity", "moderate"),
+                    "estimated_time": goal_data.get("estimated_time", "unknown"),
+                    "target_audience": goal_data.get("target_audience", "general"),
+                    "functional_requirements": goal_data.get("functional_requirements", []),
+                    "aesthetic_preferences": goal_data.get("aesthetic_preferences", "practical"),
+                    "sustainability_focus": goal_data.get("sustainability_focus", True),
+                    "budget_category": goal_data.get("budget_category", "minimal"),
+                    "tool_complexity": goal_data.get("tool_complexity", "basic"),
+                    "safety_considerations": goal_data.get("safety_considerations", []),
+                    "success_metrics": goal_data.get("success_metrics", [])
+                })
 
-            # Save goal data to Redis
-            goal_key = f"goals:{state.thread_id}"
-            redis_service.set(goal_key, json.dumps(goal_data), ex=3600)
+                # Save goal data to Redis
+                goal_key = f"goals:{state.thread_id}"
+                redis_service.set(goal_key, json.dumps(goal_data), ex=3600)
 
-            state.current_node = "O1"
-            logger.info(f"G1: Goal formation complete - {goal_data['artifact_type']}")
+                state.current_node = "O1"
+                logger.info(f"✅ G1: Goal formation complete - {goal_data['artifact_type']}")
 
-            return {
-                "goals": state.goals,
-                "artifact_type": state.artifact_type,
-                "current_node": "O1",
-                "goal_data": goal_data
-            }
+                return {
+                    "goals": state.goals,
+                    "artifact_type": state.artifact_type,
+                    "current_node": "O1",
+                    "goal_data": goal_data
+                }
+            else:
+                # Validation returned None or missing required fields
+                logger.warning("G1: AI response validation failed, using fallback goal")
+                raise ValueError("Invalid goal data structure")
+        else:
+            error_message = response.get("error", "Unknown error") if response else "No response"
+            logger.error(f"G1: AI agent call failed: {error_message}")
+            raise Exception(f"AI agent call failed: {error_message}")
 
     except Exception as e:
         logger.error(f"G1: Goal formation failed: {str(e)}")
         state.errors.append(f"Goal formation failed: {str(e)}")
 
-        # Fallback goal formation
-        fallback_goal = f"Create a useful household item from {len(state.ingredients_data.ingredients)} recycled materials"
+        # FALLBACK: Create reasonable default goal
+        materials_list = [ing.material for ing in state.ingredients_data.ingredients if ing.material]
+        unique_materials = list(set(materials_list))
+
+        fallback_goal = f"Create a practical {state.user_input or 'household item'} using {', '.join(unique_materials[:3])}"
         state.goals = fallback_goal
         state.artifact_type = "household_utility"
+        state.user_constraints.update({
+            "project_complexity": "moderate",
+            "tool_complexity": "basic"
+        })
         state.current_node = "O1"
+        logger.info(f"⚠️ G1: Using fallback goal - {fallback_goal}")
+
+        # Save fallback goal data to Redis
+        fallback_goal_data = {
+            "primary_goal": fallback_goal,
+            "artifact_type": "household_utility",
+            "project_complexity": "moderate"
+        }
+        goal_key = f"goals:{state.thread_id}"
+        redis_service.set(goal_key, json.dumps(fallback_goal_data), ex=3600)
 
     return {
         "goals": state.goals,
@@ -277,8 +331,13 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate inputs
     if not state.goals or not state.ingredients_data:
         logger.error("O1: Missing goals or ingredient data")
-        state.errors.append("Choice generation requires goals and ingredients")
-        return {"error": "Missing required data"}
+        message = "Choice generation requires goals and ingredients"
+        state.errors.append(message)
+        return {
+            "errors": state.errors,
+            "current_node": "O1",
+            "viable_options": []
+        }
 
     # Build choice generation prompt
     ingredients_list = [
@@ -302,7 +361,7 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
     - Estimated time: {state.user_constraints.get('estimated_time', 'flexible')}
     - Safety considerations: {', '.join(state.user_constraints.get('safety_considerations', []))}
 
-    Generate 3-5 distinct, viable project options that:
+    Generate 3 distinct, viable project options that:
     1. Use the available materials effectively
     2. Achieve the stated goal
     3. Vary in approach/style (minimalist, decorative, functional, etc.)
@@ -323,17 +382,14 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
 
     try:
         # Call Gemini Pro for creative choice generation
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-pro",
+        response = await production_call_gemini(
             prompt=choice_prompt,
-            generation_config={
-                "response_schema": CHOICE_GENERATION_SCHEMA,
-                "temperature": 0.7,  # Higher creativity for ideation
-            }
+            task_type="creative",
+            response_schema=CHOICE_GENERATION_SCHEMA
         )
 
-        if response.text:
-            choice_data = json.loads(response.text)
+        if response and not response.get("error"):
+            choice_data = response  # Response is already parsed JSON
             viable_options = choice_data.get("viable_options", [])
 
             # Convert to state format and store
@@ -351,6 +407,10 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
                 "current_node": "E1",
                 "generation_metadata": choice_data.get("generation_metadata", {})
             }
+        else:
+            error_message = response.get("error", "Unknown error") if response else "No response"
+            logger.error(f"O1: AI agent call failed: {error_message}")
+            raise Exception(f"AI agent call failed: {error_message}")
 
     except Exception as e:
         logger.error(f"O1: Choice generation failed: {str(e)}")
@@ -370,6 +430,19 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
         state.viable_options = [fallback_option]
         state.current_node = "E1"
 
+        # Save fallback choices to Redis
+        fallback_choices_data = {
+            "viable_options": [fallback_option],
+            "generation_metadata": {
+                "total_options": 1,
+                "generation_strategy": "fallback",
+                "material_utilization": 0.5,
+                "creativity_score": 0.3
+            }
+        }
+        choices_key = f"choices:{state.thread_id}"
+        redis_service.set(choices_key, json.dumps(fallback_choices_data), ex=3600)
+
     return {
         "viable_options": state.viable_options,
         "current_node": "E1"
@@ -386,8 +459,18 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate inputs
     if not state.viable_options:
         logger.error("E1: No viable options to evaluate")
-        state.errors.append("Evaluation requires viable options")
-        return {"error": "No options to evaluate"}
+        message = "Evaluation requires viable options"
+        state.errors.append(message)
+        return {
+            "errors": state.errors,
+            "current_node": "E1",
+            "current_phase": state.current_phase,
+            "evaluated_options": [],
+        }
+
+    # Ensure every option has a stable identifier for downstream lookups
+    for idx, option in enumerate(state.viable_options, start=1):
+        option.setdefault("option_id", f"opt_{idx:02d}")
 
     # Build evaluation prompt
     options_for_eval = []
@@ -449,20 +532,14 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
 
     try:
         # Call Gemini Pro for comprehensive evaluation
-        response = await call_gemini_with_retry(
-            model_name="gemini-2.5-pro",
+        response = await production_call_gemini(
             prompt=evaluation_prompt,
-            generation_config={
-                "response_schema": EVALUATION_SCHEMA,
-                "temperature": 0.2,  # Low temperature for consistent evaluation
-                "safety_settings": [
-                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-                ]  # Allow safety analysis discussion
-            }
+            task_type="analysis",
+            response_schema=EVALUATION_SCHEMA
         )
 
-        if response.text:
-            eval_data = json.loads(response.text)
+        if response and not response.get("error"):
+            eval_data = response  # Response is already parsed JSON
             evaluated_options = eval_data.get("evaluated_options", [])
             safety_assessment = eval_data.get("safety_assessment", {})
 
@@ -485,7 +562,7 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
             # Update state with top options
             recommended_options = [
                 opt for opt in evaluated_options
-                if opt.get("is_recommended", True) and opt["option_id"] not in blocked_options
+                if opt.get("is_recommended", True) and opt.get("option_id") not in blocked_options
             ]
 
             if recommended_options:
@@ -505,6 +582,10 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
             else:
                 logger.error("E1: No safe options recommended")
                 state.errors.append("No safe options passed evaluation")
+        else:
+            error_message = response.get("error", "Unknown error") if response else "No response"
+            logger.error(f"E1: AI agent call failed: {error_message}")
+            raise Exception(f"AI agent call failed: {error_message}")
 
     except Exception as e:
         logger.error(f"E1: Evaluation failed: {str(e)}")
@@ -516,7 +597,43 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
             state.current_node = "PR1"
             state.current_phase = "concept_generation"
 
+            fallback_evaluated = []
+            for idx, option in enumerate(state.viable_options, start=1):
+                option_id = option.get("option_id", f"opt_{idx:02d}")
+                fallback_evaluated.append({
+                    "option_id": option_id,
+                    "overall_score": 0.5,
+                    "feasibility_score": 0.5,
+                    "aesthetic_score": 0.5,
+                    "esg_score": 0.5,
+                    "safety_score": 0.5,
+                    "safety_flags": ["Evaluation fallback used"],
+                    "safety_check": True,
+                    "ranking": idx,
+                })
+
+            # Save fallback evaluation to Redis
+            fallback_eval_data = {
+                "evaluated_options": fallback_evaluated,
+                "safety_assessment": {
+                    "has_safety_concerns": False,
+                    "blocked_options": [],
+                    "warning_count": 0,
+                    "fallback_mode": True
+                }
+            }
+            eval_key = f"evaluation:{state.thread_id}"
+            redis_service.set(eval_key, json.dumps(fallback_eval_data), ex=3600)
+
+            return {
+                "evaluated_options": fallback_evaluated,
+                "selected_option": state.selected_option,
+                "current_node": "PR1",
+                "current_phase": "concept_generation",
+            }
+
     return {
+        "evaluated_options": [],
         "selected_option": state.selected_option,
         "current_node": "PR1",
         "current_phase": "concept_generation"

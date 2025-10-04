@@ -3,9 +3,9 @@ LangGraph orchestrator for the AI Recycle-to-Market Generator workflow.
 Implements the complete state machine with interrupt/resume patterns.
 """
 import logging
+import os
 from typing import Dict, Any
 from langgraph.graph import StateGraph, START, END
-from langgraph_checkpoint_redis import RedisSaver
 from app.workflows.state import WorkflowState
 from app.workflows.nodes import (
     ingredient_extraction_node,
@@ -40,7 +40,7 @@ from app.workflows.phase4_nodes import (
     should_prepare_sharing,
     is_phase4_complete
 )
-from app.core.redis import redis_service
+from app.core.checkpointer import create_redis_checkpointer
 
 logger = logging.getLogger(__name__)
 
@@ -221,14 +221,28 @@ class RecycleWorkflowOrchestrator:
         )
 
         # Setup Redis checkpointer for interrupt/resume
+        enable_interrupts = os.getenv("WORKFLOW_ENABLE_INTERRUPTS", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        compile_kwargs: Dict[str, Any] = {}
+        if enable_interrupts:
+            compile_kwargs["interrupt_before"] = ["process_clarification"]
+
         try:
-            checkpointer = RedisSaver(
-                redis_client=redis_service.client
+            checkpointer = create_redis_checkpointer()
+            self.compiled_graph = workflow.compile(
+                checkpointer=checkpointer,
+                **compile_kwargs,
             )
-            self.compiled_graph = workflow.compile(checkpointer=checkpointer, interrupt_before=["process_clarification"])
         except Exception as e:
-            logger.warning(f"Redis checkpointer setup failed: {e}. Running without checkpointing.")
-            self.compiled_graph = workflow.compile(interrupt_before=["process_clarification"])
+            logger.warning(
+                "Redis checkpointer setup failed: %s. Running without checkpointing.",
+                e,
+            )
+            self.compiled_graph = workflow.compile(**compile_kwargs)
 
         self.graph = workflow
         logger.info("RecycleWorkflowOrchestrator initialized successfully")
@@ -250,6 +264,7 @@ class RecycleWorkflowOrchestrator:
         initial_state = WorkflowState(
             thread_id=thread_id,
             user_input=user_input,
+            initial_user_input=user_input,
             current_phase="ingredient_discovery",
             current_node="P1a",
             start_time=__import__('time').time()

@@ -95,8 +95,28 @@ class ProductionGeminiClient:
                 "temperature": 0.3,  # Balanced for analysis
                 "max_output_tokens": 6144,
             })
+        elif task_type == "goal_formation":
+            base_config.update({
+                "temperature": 0.4,  # Strategic reasoning
+                "max_output_tokens": 8192,
+            })
 
         return base_config
+
+    def _get_timeout_for_task(self, task_type: str) -> float:
+        """Get timeout duration based on task complexity."""
+        # Complex tasks need more time
+        timeout_map = {
+            "extraction": 30.0,           # Fast extraction
+            "clarification": 30.0,        # Quick updates
+            "question_generation": 20.0,  # Simple questions
+            "categorization": 30.0,       # Pattern recognition
+            "goal_formation": 90.0,       # Complex reasoning - INCREASED
+            "creative": 90.0,             # Creative generation - INCREASED
+            "analysis": 60.0,             # Evaluation tasks - INCREASED
+            "default": 45.0,              # General tasks
+        }
+        return timeout_map.get(task_type, 45.0)
 
     @asynccontextmanager
     async def _request_context(self, operation: str):
@@ -137,7 +157,6 @@ class ProductionGeminiClient:
             settings.ENVIRONMENT == "development"
         )
 
-    @track_gemini_metrics("gemini-2.5-pro")
     async def call_gemini_with_retry(
         self,
         prompt: str,
@@ -186,10 +205,16 @@ class ProductionGeminiClient:
                             "response_schema": response_schema
                         })
 
-                    response = await model.generate_content_async(
-                        prompt,
-                        stream=False
-                    )
+                    # Use asyncio.wait_for to ensure proper cleanup
+                    # Get task-specific timeout
+                    task_timeout = self._get_timeout_for_task(task_type)
+                    try:
+                        response = await asyncio.wait_for(
+                            model.generate_content_async(prompt, stream=False),
+                            timeout=task_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        raise ProductionGeminiError(f"Gemini API timeout on attempt {attempt + 1} (timeout: {task_timeout}s)")
 
                     # Process response
                     if response.text:
@@ -220,27 +245,25 @@ class ProductionGeminiClient:
 
                         except json.JSONDecodeError as e:
                             if attempt == max_retries - 1:
-                                raise ProductionGeminiError(f"Invalid JSON response: {str(e)}")
+                                return {"error": f"Invalid JSON response: {str(e)}"}
                             else:
                                 logger.warning(f"JSON parse error on attempt {attempt + 1}, retrying...")
                                 continue
                     else:
                         if attempt == max_retries - 1:
-                            raise ProductionGeminiError("Empty response from Gemini")
+                            return {"error": "Empty response from Gemini"}
                         else:
                             logger.warning(f"Empty response on attempt {attempt + 1}, retrying...")
                             continue
 
-            except QuotaExceededError:
-                # Don't retry quota errors
-                raise
-            except SafetyError:
-                # Safety is disabled, this should not occur
+            except QuotaExceededError as e:
+                return {"error": str(e)}
+            except SafetyError as e:
                 logger.error("Unexpected safety error with disabled filters")
-                raise
+                return {"error": str(e)}
             except Exception as e:
                 if attempt == max_retries - 1:
-                    raise ProductionGeminiError(f"Max retries exceeded: {str(e)}")
+                    return {"error": f"Max retries exceeded: {str(e)}"}
                 else:
                     # Exponential backoff
                     delay = (2 ** attempt) + (time.time() % 1)

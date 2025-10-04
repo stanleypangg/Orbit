@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, AsyncIterator
 import google.generativeai as genai
 from app.core.config import settings
@@ -17,6 +18,44 @@ logger = logging.getLogger(__name__)
 class GeminiStructuredError(Exception):
     """Exception for Gemini structured output errors."""
     pass
+
+
+_UNSUPPORTED_SCHEMA_KEYS = {
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+}
+
+
+def _normalize_response_schema(schema: Any) -> Any:
+    """Convert list-based type declarations into nullable fields and drop unsupported keywords."""
+    if isinstance(schema, dict):
+        normalized: Dict[str, Any] = {}
+        for key, value in schema.items():
+            if key in _UNSUPPORTED_SCHEMA_KEYS:
+                continue
+            if key == "type" and isinstance(value, list):
+                null_types = [t for t in value if isinstance(t, str) and t.lower() == "null"]
+                non_null_types = [t for t in value if isinstance(t, str) and t.lower() != "null"]
+                if len(non_null_types) == 1 and null_types:
+                    normalized["type"] = non_null_types[0]
+                    normalized.setdefault("nullable", True)
+                    continue
+
+            normalized[key] = _normalize_response_schema(value)
+        return normalized
+
+    if isinstance(schema, list):
+        return [_normalize_response_schema(item) for item in schema]
+
+    return schema
 
 
 class GeminiStructuredClient:
@@ -51,7 +90,7 @@ class GeminiStructuredClient:
     async def generate_structured(
         self,
         prompt: str,
-        response_schema: Dict[str, Any],
+        response_schema: Any,
         model_config: Optional[GeminiModelConfig] = None,
         system_instruction: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -83,8 +122,9 @@ class GeminiStructuredClient:
 
         # Add response schema if structured output is enabled
         if model_config.use_structured_output:
+            normalized_schema = _normalize_response_schema(deepcopy(response_schema))
             generation_config["response_mime_type"] = "application/json"
-            generation_config["response_schema"] = response_schema
+            generation_config["response_schema"] = normalized_schema
 
         # Prepare model kwargs
         model_kwargs = {
