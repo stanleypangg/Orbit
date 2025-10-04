@@ -32,12 +32,9 @@ async def test_phase1_full_ingredient_discovery_flow(mock_gemini_client):
         # Act
         final_state = await workflow.ainvoke(initial_input, config=config)
 
-    # Assert
-    assert "ingredients_data" in final_state
-    final_ingredients = final_state["ingredients_data"]
-
-    # With mock fixture, should complete extraction
-    assert len(final_ingredients.ingredients) >= 1
+    # Assert that Phase 1 is complete
+    assert final_state["extraction_complete"] is True
+    assert len(final_state["ingredients_data"].ingredients) >= 1
 
 @pytest.mark.asyncio
 async def test_phase2_safety_blocking_integration():

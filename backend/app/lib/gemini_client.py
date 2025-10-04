@@ -56,19 +56,6 @@ class GeminiClient:
             "temperature": 0.7,
             "max_output_tokens": 1024,
         }
-<<<<<<< HEAD
-        
-        # Safety settings - permissive for MVP (can be tightened later)
-        self.safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
-        logger.info(f"Initialized GeminiClient with model: {self.model_name}")
-    
-=======
 
         # No safety settings - disabled for unrestricted operation
         from google.generativeai.types import HarmCategory, HarmBlockThreshold
@@ -84,7 +71,7 @@ class GeminiClient:
 
     def use_flash_model(self) -> 'GeminiClient':
         """Switch to faster Flash model for simple operations."""
-        self.model_name = self.flash_model
+        self.model_name = "gemini-1.5-flash"
         logger.info(f"Switched to Flash model: {self.model_name}")
         return self
 
@@ -95,7 +82,6 @@ class GeminiClient:
         logger.info(f"Switched to Pro model: {self.model_name}")
         return self
 
->>>>>>> 4d5f177 (WIP: move changes to ai-agent)
     def _convert_messages_to_gemini_format(
         self,
         messages: List[ChatMessage],

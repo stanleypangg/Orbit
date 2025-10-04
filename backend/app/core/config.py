@@ -6,9 +6,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Prefer production settings when available, fall back to default
-dotenv_path = Path(__file__).parent.parent.parent / ".env.production"
+dotenv_path = Path(__file__).parent.parent.parent / ".env"
 if dotenv_path.exists():
-    print("Loading .env.production")
+    print("Loading .env")
     load_dotenv(dotenv_path)
 else:
     print("Loading .env")
