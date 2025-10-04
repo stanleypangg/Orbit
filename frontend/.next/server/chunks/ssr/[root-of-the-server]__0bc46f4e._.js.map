@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 3, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
-    {"offset": {"line": 15, "column": 0}, "map": {"version":3,"sources":["file:///Users/cute/Documents/vsc/HTV/frontend/app/page.tsx"],"sourcesContent":["export default function Home() {\n  return (\n    <div className=\"min-h-screen flex items-center justify-center\">\n      <h1 className=\"text-4xl font-bold\">Welcome to Next.js</h1>\n    </div>\n  );\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACtB,qBACE,qRAAC;QAAI,WAAU;kBACb,cAAA,qRAAC;YAAG,WAAU;sBAAqB;;;;;;;;;;;AAGzC","debugId":null}}]
-}
