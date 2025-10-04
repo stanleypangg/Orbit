@@ -3,7 +3,7 @@ Workflow state management for the AI Recycle-to-Market Generator.
 Defines the state schema for LangGraph orchestration.
 """
 from typing import Dict, List, Optional, Any, Annotated
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from langgraph.graph import add_messages
 from langchain_core.messages import BaseMessage
 import json
@@ -109,6 +109,8 @@ class WorkflowState(BaseModel):
 
     # User input and intent
     user_input: str = ""
+    initial_user_input: Optional[str] = None
+    latest_user_response: Optional[str] = None
     user_intent: Optional[str] = None
     user_constraints: Dict[str, Any] = Field(default_factory=dict)
 
@@ -133,12 +135,18 @@ class WorkflowState(BaseModel):
     concept_variants: List[ConceptVariant] = Field(default_factory=list)
     selected_concept: Optional[ConceptVariant] = None
     edit_requests: List[str] = Field(default_factory=list)
+    concept_images: Optional[Dict[str, Any]] = None
+    project_preview: Optional[Dict[str, Any]] = None
 
     # Output assembly (Phase 4)
     final_output: Optional[Dict[str, Any]] = None
     esg_report: Optional[Dict[str, Any]] = None
     diy_guide: Optional[Dict[str, Any]] = None
     bom_data: Optional[Dict[str, Any]] = None
+    final_package: Optional[Dict[str, Any]] = None
+    exports: Optional[Dict[str, Any]] = None
+    analytics: Optional[Dict[str, Any]] = None
+    sharing_assets: Optional[Dict[str, Any]] = None
 
     # Workflow control
     current_phase: str = "ingredient_discovery"  # ingredient_discovery, goal_formation, concept_generation, output_assembly
@@ -204,3 +212,10 @@ class WorkflowState(BaseModel):
         import time
         if self.start_time:
             self.phase_times[phase] = time.time() - self.start_time
+
+    @model_validator(mode="after")
+    def _set_initial_input(cls, state: "WorkflowState") -> "WorkflowState":
+        """Ensure initial_user_input is always populated for downstream logic."""
+        if not state.initial_user_input:
+            state.initial_user_input = state.user_input
+        return state

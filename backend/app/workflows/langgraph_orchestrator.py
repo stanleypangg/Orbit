@@ -132,12 +132,12 @@ class RecycleWorkflowOrchestrator:
                                 "material": {"type": "string", "description": "Material type (aluminum, plastic, glass, etc.)"},
                                 "size": {"type": "string", "description": "Size description if mentioned"},
                                 "condition": {"type": "string", "description": "Condition if mentioned"},
-                                "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                                "confidence": {"type": "number"}
                             },
                             "required": ["name", "material", "confidence"]
                         }
                     },
-                    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+                    "confidence": {"type": "number"}
                 },
                 "required": ["ingredients", "confidence"]
             }

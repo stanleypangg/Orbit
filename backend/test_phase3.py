@@ -57,7 +57,7 @@ PHASE3_TEST_STATE = {
         "difficulty_level": "beginner",
         "time_estimate": "1-2 hours",
         "category": "office_organization",
-        "esg_score": {"environmental": 8, "social": 6, "governance": 7},
+        "esg_score": 0.7,
         "safety_assessment": {
             "safety_level": "low",
             "required_ppe": ["safety glasses"],

@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, AsyncIterator
 import google.generativeai as genai
 from app.core.config import settings
@@ -17,6 +18,44 @@ logger = logging.getLogger(__name__)
 class GeminiStructuredError(Exception):
     """Exception for Gemini structured output errors."""
     pass
+
+
+_UNSUPPORTED_SCHEMA_KEYS = {
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+}
+
+
+def _normalize_response_schema(schema: Any) -> Any:
+    """Convert list-based type declarations into nullable fields and drop unsupported keywords."""
+    if isinstance(schema, dict):
+        normalized: Dict[str, Any] = {}
+        for key, value in schema.items():
+            if key in _UNSUPPORTED_SCHEMA_KEYS:
+                continue
+            if key == "type" and isinstance(value, list):
+                null_types = [t for t in value if isinstance(t, str) and t.lower() == "null"]
+                non_null_types = [t for t in value if isinstance(t, str) and t.lower() != "null"]
+                if len(non_null_types) == 1 and null_types:
+                    normalized["type"] = non_null_types[0]
+                    normalized.setdefault("nullable", True)
+                    continue
+
+            normalized[key] = _normalize_response_schema(value)
+        return normalized
+
+    if isinstance(schema, list):
+        return [_normalize_response_schema(item) for item in schema]
+
+    return schema
 
 
 class GeminiStructuredClient:
@@ -51,7 +90,7 @@ class GeminiStructuredClient:
     async def generate_structured(
         self,
         prompt: str,
-        response_schema: Dict[str, Any],
+        response_schema: Any,
         model_config: Optional[GeminiModelConfig] = None,
         system_instruction: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -75,19 +114,6 @@ class GeminiStructuredClient:
         if not model_config:
             model_config = GeminiModelConfig()
 
-        # Debug: Log schema details
-        logger.debug(f"Schema type: {type(response_schema)}")
-        logger.debug(f"Schema keys: {list(response_schema.keys()) if isinstance(response_schema, dict) else 'N/A'}")
-        
-        # Check for unhashable types in schema
-        try:
-            schema_json = json.dumps(response_schema, indent=2)
-            logger.debug(f"Schema JSON serialization: SUCCESS ({len(schema_json)} chars)")
-        except TypeError as e:
-            logger.error(f"Schema contains unhashable types: {e}")
-            logger.error(f"Problematic schema structure: {response_schema}")
-            raise GeminiStructuredError(f"Invalid schema structure: {e}")
-
         # Prepare generation config
         generation_config = {
             "temperature": model_config.temperature,
@@ -96,9 +122,9 @@ class GeminiStructuredClient:
 
         # Add response schema if structured output is enabled
         if model_config.use_structured_output:
+            normalized_schema = _normalize_response_schema(deepcopy(response_schema))
             generation_config["response_mime_type"] = "application/json"
-            generation_config["response_schema"] = response_schema
-            logger.debug(f"Using structured output with schema (type={response_schema.get('type', 'unknown')})")
+            generation_config["response_schema"] = normalized_schema
 
         # Prepare model kwargs
         model_kwargs = {
@@ -109,17 +135,11 @@ class GeminiStructuredClient:
 
         if system_instruction:
             model_kwargs["system_instruction"] = system_instruction
-            logger.debug(f"System instruction: {system_instruction[:100]}...")
-
-        logger.info(f"Initializing Gemini model: {model_config.model_name}")
 
         for attempt in range(self.retry_config["max_retries"]):
             try:
-                logger.debug(f"Attempt {attempt + 1}/{self.retry_config['max_retries']}: Creating GenerativeModel...")
-                
                 # Create model
                 model = genai.GenerativeModel(**model_kwargs)
-                logger.debug("GenerativeModel created successfully")
 
                 # Generate content
                 if model_config.use_structured_output:

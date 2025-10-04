@@ -2,3 +2,5 @@
 .env
 .claude
 node_modules
+.md
+!README.md

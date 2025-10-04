@@ -296,6 +296,10 @@ class OptimizedWorkflowState(BaseModel):
     esg_report: Optional[Dict[str, Any]] = None
     diy_guide: Optional[Dict[str, Any]] = None
     bom_data: Optional[Dict[str, Any]] = None
+    final_package: Optional[Dict[str, Any]] = None
+    exports: Optional[Dict[str, Any]] = None
+    analytics: Optional[Dict[str, Any]] = None
+    sharing_assets: Optional[Dict[str, Any]] = None
 
     # Enhanced workflow control
     current_phase: WorkflowPhase = WorkflowPhase.INGREDIENT_DISCOVERY
