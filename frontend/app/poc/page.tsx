@@ -20,6 +20,9 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [animationPhase, setAnimationPhase] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [animatedMessageIds, setAnimatedMessageIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const presets = [
     {
@@ -72,62 +75,75 @@ export default function Home() {
     }, 600);
 
     setTimeout(() => {
-      // Phase 4: Switch to chat mode and show chat input (1000ms)
-      setIsChatMode(true);
+      // Phase 4: Prepare for transition (1300ms) - wait for grow to finish
+      setAnimationPhase(4);
+    }, 1300);
+
+    setTimeout(() => {
+      // Phase 5: Switch to chat mode and show first message (1400ms)
+      const messageId = Date.now().toString();
       setMessages([
         {
           role: "user",
           content: initialMessage,
-          id: Date.now().toString(),
+          id: messageId,
         },
       ]);
-      setAnimationPhase(4);
-    }, 1000);
+      setAnimatedMessageIds(new Set([messageId]));
+      setIsChatMode(true);
+      setAnimationPhase(5);
+    }, 1400);
 
     setTimeout(() => {
-      // Phase 5: First message animation complete
-      setAnimationPhase(5);
+      // Phase 6: Animation complete, fetch AI response
+      setAnimationPhase(6);
       setIsGenerating(false);
 
       // TODO: Call API and add assistant response
       // For now, mock response
       setTimeout(() => {
+        const assistantId = (Date.now() + 1).toString();
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
             content:
               "I understand you want to create something from waste materials. Let me help you with that!",
-            id: (Date.now() + 1).toString(),
+            id: assistantId,
           },
         ]);
+        setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
       }, 500);
-    }, 1400);
+    }, 1900);
   };
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
 
+    const userMessageId = Date.now().toString();
     const userMessage: Message = {
       role: "user",
       content: chatInput,
-      id: Date.now().toString(),
+      id: userMessageId,
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    setAnimatedMessageIds((prev) => new Set([...prev, userMessageId]));
     setChatInput("");
 
     // TODO: Call API for response
     setTimeout(() => {
+      const assistantId = (Date.now() + 1).toString();
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
             "This is a mock response. Integration with Gemini API pending.",
-          id: (Date.now() + 1).toString(),
+          id: assistantId,
         },
       ]);
+      setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
     }, 1000);
   };
 
@@ -138,7 +154,7 @@ export default function Home() {
   if (isChatMode) {
     // Chat Interface
     return (
-      <div className="min-h-screen bg-[#181A25] flex flex-col">
+      <div className="min-h-screen bg-[#181A25] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
           <Image
@@ -168,34 +184,38 @@ export default function Home() {
             Turn Waste into Products
           </h1>
 
-          {/* Messages Area */}
-          <div
-            className={`flex-1 bg-[#232937] border border-[#4ade80] p-6 mb-4 overflow-y-auto transition-all duration-700 ease-out ${
-              animationPhase >= 4 ? "opacity-100" : "opacity-0"
-            }`}
-          >
+          {/* Messages Area - This is the grown textarea transformed */}
+          <div className="flex-1 bg-[#232937] border border-[#4ade80] p-6 mb-4 overflow-y-auto">
             <div className="space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  } animate-slideIn`}
-                  style={{
-                    animationDelay: `${index * 100}ms`,
-                  }}
-                >
+              {messages.map((message) => {
+                const shouldAnimate = animatedMessageIds.has(message.id);
+                return (
                   <div
-                    className={`max-w-[70%] px-4 py-3 rounded-lg ${
-                      message.role === "user"
-                        ? "bg-[#4ade80] text-black"
-                        : "bg-[#2A3142] text-white"
+                    key={message.id}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
                     }`}
                   >
-                    {message.content}
+                    <div
+                      className={`max-w-[70%] px-4 py-3 rounded-lg ${
+                        message.role === "user"
+                          ? "bg-[#4ade80] text-black"
+                          : "bg-[#2A3142] text-white"
+                      }`}
+                      style={
+                        shouldAnimate
+                          ? {
+                              animation:
+                                "popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards",
+                            }
+                          : undefined
+                      }
+                    >
+                      {message.content}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -203,7 +223,7 @@ export default function Home() {
           {/* Chat Input */}
           <div
             className={`transition-all duration-500 ease-out ${
-              animationPhase >= 4
+              animationPhase >= 5
                 ? "translate-y-0 scale-100 opacity-100"
                 : "translate-y-full scale-95 opacity-0"
             }`}
@@ -292,7 +312,7 @@ export default function Home() {
               }
               style={{
                 height: animationPhase >= 3 ? "60vh" : "10rem",
-                transition: "height 700ms ease-out",
+                transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
               className="w-full bg-[#232937] text-white text-base border p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-gray-500"
             />
