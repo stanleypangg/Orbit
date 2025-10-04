@@ -225,7 +225,7 @@ class ConceptVariant(BaseModel):
     estimated_time: Optional[str] = None
     difficulty_level: str = "beginner"  # beginner, intermediate, advanced
     generation_time: Optional[float] = None
-    model_config: Optional[GeminiModelConfig] = None
+    gemini_config: Optional[GeminiModelConfig] = None
 
 
 class PerformanceMetrics(BaseModel):

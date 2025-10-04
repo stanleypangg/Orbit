@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///Users/cute/Documents/vsc/HTV/frontend/app/globals.css"],"sourcesContent":["@import \"tailwindcss\";\n\n@layer utilities {\n  .bg-gradient-radial {\n    background: radial-gradient(circle, var(--tw-gradient-stops));\n  }\n}\n\n@keyframes slideIn {\n  from {\n    opacity: 0;\n    transform: translateX(20px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(0);\n  }\n}\n\n.animate-slideIn {\n  animation: slideIn 0.4s ease-out forwards;\n}\n\n@keyframes popIn {\n  0% {\n    opacity: 0;\n    transform: scale(0.8) translateY(10px);\n  }\n  50% {\n    transform: scale(1.05) translateY(-5px);\n  }\n  100% {\n    opacity: 1;\n    transform: scale(1) translateY(0);\n  }\n}\n\n.animate-popIn {\n  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;\n}\n\n@keyframes fadeIn {\n  from {\n    opacity: 0;\n    transform: translateY(10px);\n  }\n  to {\n    opacity: 1;\n    transform: translateY(0);\n  }\n}\n\n.animate-fadeIn {\n  animation: fadeIn 0.5s ease-out forwards;\n}\n"],"names":[],"mappings":"AAEA;EACE;;;;;AAKF;;;;;;;;;;;;AAWA;;;;AAIA;;;;;;;;;;;;;;;;AAcA;;;;AAIA;;;;;;;;;;;;AAWA","debugId":null}}]
+}

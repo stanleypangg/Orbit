@@ -13,4 +13,36 @@ services:
       - PYTHONUNBUFFERED=1
       - GRPC_VERBOSITY=ERROR
       - GRPC_PYTHON_LOG_LEVEL=ERROR
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - dev_network
+
+  # Redis for LangGraph checkpointing and session management
+  redis:
+    image: redis:7-alpine
+    container_name: dev_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dev_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  dev_network:
+    driver: bridge
 

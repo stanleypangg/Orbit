@@ -73,6 +73,31 @@ class ConceptVariant(BaseModel):
     difficulty_level: str = "beginner"  # beginner, intermediate, advanced
 
 
+class ChosenIdea(BaseModel):
+    """Selected idea from ideation phase."""
+    id: str
+    name: str
+    short_scope: str
+    end_product_description: str
+
+
+class IdeationDraft(BaseModel):
+    """Ephemeral draft idea with general image."""
+    id: str
+    name: str
+    one_liner: str
+    assumptions: List[str] = Field(default_factory=list)
+    draft_image: Optional[Dict[str, Any]] = None  # {url, seed, notes}
+
+
+class ProjectContext(BaseModel):
+    """Persistent project context tracking across phases."""
+    assumptions: List[str] = Field(default_factory=list)
+    clarifications: Dict[str, str] = Field(default_factory=dict)  # question -> answer
+    confidence: float = 0.0
+    chosen_idea: Optional[ChosenIdea] = None
+
+
 class WorkflowState(BaseModel):
     """
     Complete state for the AI Recycle-to-Market Generator workflow.
@@ -89,9 +114,14 @@ class WorkflowState(BaseModel):
     user_intent: Optional[str] = None
     user_constraints: Dict[str, Any] = Field(default_factory=dict)
 
-    # Progressive ingredient discovery (Phase 1)
+    # Progressive ingredient discovery (Phase 1) with requirements loop
     ingredients_data: Optional[IngredientsData] = None
     extraction_complete: bool = False
+    clarify_cycles: int = 0  # Track clarification loop iterations
+    project_context: ProjectContext = Field(default_factory=ProjectContext)
+    
+    # Ideation phase (ephemeral drafts - do not persist long-term)
+    ideation_drafts: Optional[List[IdeationDraft]] = None
 
     # Goal formation (Phase 2)
     goals: Optional[str] = None
