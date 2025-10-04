@@ -21,7 +21,7 @@ export default function Phase1Page() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white font-menlo">
+    <div className="min-h-screen bg-[#161924] font-menlo">
       <div className="container mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="text-center mb-8">
@@ -120,7 +120,7 @@ export default function Phase1Page() {
 
         {/* Example Section */}
         <div className="mt-12 max-w-4xl mx-auto">
-          <div className="bg-gray-50 rounded-lg p-6">
+          <div className="bg-[#2A3038] rounded-lg p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Example Inputs
             </h2>

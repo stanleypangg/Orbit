@@ -215,9 +215,9 @@ export default function Home() {
   if (isChatMode) {
     // Chat Interface
     return (
-      <div className="min-h-screen bg-[#181A25] flex flex-col overflow-hidden font-menlo">
+      <div className="min-h-screen bg-[#161924] flex flex-col overflow-hidden font-menlo">
         {/* Header */}
-        <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
+        <div className="p-4 bg-[#1E2433] border-b-[0.5px] border-[#2A3142] flex items-center gap-4">
           <Image
             src="/logo_text.svg"
             alt="Orbit"
@@ -249,7 +249,7 @@ export default function Home() {
         <div className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8">
           {/* Messages Area - This is the grown textarea transformed */}
           <div
-            className="bg-[#232937] border border-[#4ade80] p-6 overflow-y-auto"
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto"
             style={{
               height:
                 animationPhase >= 7
@@ -293,7 +293,7 @@ export default function Home() {
                     {message.phase1Data && (
                       <div className="mt-4 space-y-4">
                         {/* Ingredients Section */}
-                        <div className="bg-[#1a2030] border border-[#3a4560] rounded-lg p-4">
+                        <div className="bg-[#1a2030] border-[0.5px] border-[#3a4560] rounded-lg p-4">
                           <h3 className="text-[#4ade80] text-lg font-semibold mb-3">
                             📦 Extracted Materials
                           </h3>
@@ -302,7 +302,7 @@ export default function Home() {
                               (ingredient, idx) => (
                                 <div
                                   key={idx}
-                                  className="bg-[#232937] rounded p-3 border border-[#2A3142]"
+                                  className="bg-[#232937] rounded p-3 border-[0.5px] border-[#2A3142]"
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
@@ -347,7 +347,7 @@ export default function Home() {
                           message.phase1Data.clarifying_questions &&
                           message.phase1Data.clarifying_questions.length >
                             0 && (
-                            <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
+                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
                               <h3 className="text-yellow-400 text-lg font-semibold mb-2">
                                 ❓ Need More Information
                               </h3>
@@ -376,7 +376,7 @@ export default function Home() {
                               <div
                                 key={idea.id}
                                 onClick={() => handleIdeaSelect(idea)}
-                                className="bg-[#1a2030] border border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
+                                className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
                                 style={{
                                   animation: "fadeIn 0.5s ease-out forwards",
                                 }}
@@ -421,7 +421,7 @@ export default function Home() {
                   }
                 }}
                 placeholder="Continue the conversation..."
-                className="flex-1 bg-[#232937] text-white text-base border border-[#4ade80] p-4 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-gray-500 rounded"
+                className="flex-1 bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-gray-500 rounded"
                 rows={2}
               />
               <button
@@ -440,9 +440,9 @@ export default function Home() {
 
   // Initial Form UI
   return (
-    <div className="min-h-screen bg-[#181A25] overflow-hidden font-menlo">
+    <div className="min-h-screen bg-[#161924] overflow-hidden font-menlo">
       {/* Header */}
-      <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
+      <div className="p-4 bg-[#1E2433] border-b-[0.5px] border-[#2A3142] flex items-center gap-4">
         <Image
           src="/logo_text.svg"
           alt="Orbit"
@@ -537,7 +537,7 @@ export default function Home() {
                 height: animationPhase >= 4 ? "60vh" : "10rem",
                 transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
-              className="w-full bg-[#232937] text-white text-base border p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-gray-500"
+              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-gray-500"
             />
           </div>
         </div>

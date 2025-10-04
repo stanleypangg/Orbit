@@ -86,7 +86,7 @@ const productData = {
 
 export default function ProductDetail() {
   return (
-    <div className="min-h-screen bg-[#181A25] font-menlo">
+    <div className="min-h-screen bg-[#161924] font-menlo">
       {/* Header */}
       <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
         <Image

@@ -68,7 +68,7 @@ export default function StoryboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#181A25] flex flex-col font-menlo">
+    <div className="min-h-screen bg-[#161924] flex flex-col font-menlo">
       {/* Header */}
       <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
         <Link href="/poc">

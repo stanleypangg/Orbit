@@ -85,7 +85,7 @@ export default function TrellisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-menlo">
+    <div className="min-h-screen bg-[#161924] p-8 font-menlo">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Trellis 3D Generator</h1>
 
@@ -154,7 +154,7 @@ export default function TrellisPage() {
 
             {/* Lighting Controls */}
             {glbUrl && (
-              <div className="mb-4 space-y-3 bg-gray-50 p-4 rounded-lg">
+              <div className="mb-4 space-y-3 bg-[#2A3038] p-4 rounded-lg">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Environment Preset

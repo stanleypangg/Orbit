@@ -30,8 +30,8 @@ export default function Home() {
           <Image
             src="/landing.png"
             alt="Isometric room"
-            width={500}
-            height={500}
+            width={600}
+            height={600}
             priority
           />
         </div>
