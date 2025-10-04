@@ -11,19 +11,19 @@ router = APIRouter(prefix="/trellis", tags=["trellis"])
 
 class Generate3DRequest(BaseModel):
     images: List[str]
-    seed: int = 0
-    randomize_seed: bool = True
-    texture_size: int = 1024
-    mesh_simplify: float = 0.95
+    seed: int = 1337
+    randomize_seed: bool = False
+    texture_size: int = 2048
+    mesh_simplify: float = 0.96
     generate_color: bool = True
     generate_normal: bool = False
-    generate_model: bool = False
+    generate_model: bool = True
     save_gaussian_ply: bool = False
-    return_no_background: bool = False
-    ss_sampling_steps: int = 12
-    ss_guidance_strength: float = 7.5
-    slat_sampling_steps: int = 12
-    slat_guidance_strength: float = 3.0
+    return_no_background: bool = True
+    ss_sampling_steps: int = 26
+    ss_guidance_strength: float = 8.0
+    slat_sampling_steps: int = 26
+    slat_guidance_strength: float = 3.2
 
 
 @router.post("/generate", response_model=TrellisOutput)
@@ -40,7 +40,24 @@ async def generate_3d_asset(request: Generate3DRequest):
     - no_background_images: Preprocessed images (if return_no_background=True)
     """
     try:
-        logger.info(f"Generating 3D asset with images: {request.images}")
+        logger.info("=" * 80)
+        logger.info("TRELLIS REQUEST PARAMETERS:")
+        logger.info(f"  images: {request.images}")
+        logger.info(f"  seed: {request.seed}")
+        logger.info(f"  randomize_seed: {request.randomize_seed}")
+        logger.info(f"  texture_size: {request.texture_size}")
+        logger.info(f"  mesh_simplify: {request.mesh_simplify}")
+        logger.info(f"  generate_color: {request.generate_color}")
+        logger.info(f"  generate_normal: {request.generate_normal}")
+        logger.info(f"  generate_model: {request.generate_model}")
+        logger.info(f"  save_gaussian_ply: {request.save_gaussian_ply}")
+        logger.info(f"  return_no_background: {request.return_no_background}")
+        logger.info(f"  ss_sampling_steps: {request.ss_sampling_steps}")
+        logger.info(f"  ss_guidance_strength: {request.ss_guidance_strength}")
+        logger.info(f"  slat_sampling_steps: {request.slat_sampling_steps}")
+        logger.info(f"  slat_guidance_strength: {request.slat_guidance_strength}")
+        logger.info("=" * 80)
+        
         output = trellis_service.generate_3d_asset(
             images=request.images,
             seed=request.seed,

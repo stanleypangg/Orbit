@@ -42,7 +42,7 @@ export default function TrellisPage() {
       // Upload the image to get a public URL
       const imageUrl = await uploadImageToTemporaryHost(selectedImage);
 
-      // Call the Trellis API
+      // Call the Trellis API - backend has optimized defaults configured
       const response = await fetch("http://localhost:8000/trellis/generate", {
         method: "POST",
         headers: {
@@ -50,10 +50,6 @@ export default function TrellisPage() {
         },
         body: JSON.stringify({
           images: [imageUrl],
-          generate_model: true,
-          texture_size: 2048,
-          mesh_simplify: 0.95,
-          ss_sampling_steps: 38,
         }),
       });
 
