@@ -18,8 +18,20 @@ export default function TrellisPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [glbUrl, setGlbUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [contrast, setContrast] = useState(1.5);
-  const [exposure, setExposure] = useState(1.2);
+  const [contrast, setContrast] = useState(3.0);
+  const [exposure, setExposure] = useState(2.0);
+  const [environmentPreset, setEnvironmentPreset] = useState<
+    | "city"
+    | "sunset"
+    | "dawn"
+    | "night"
+    | "warehouse"
+    | "forest"
+    | "apartment"
+    | "studio"
+    | "park"
+    | "lobby"
+  >("studio");
   const controlsRef = useRef<OrbitControlsImpl>(null);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,6 +152,73 @@ export default function TrellisPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-semibold mb-4">3D Model Preview</h2>
 
+            {/* Lighting Controls */}
+            {glbUrl && (
+              <div className="mb-4 space-y-3 bg-gray-50 p-4 rounded-lg">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Environment Preset
+                  </label>
+                  <select
+                    value={environmentPreset}
+                    onChange={(e) =>
+                      setEnvironmentPreset(e.target.value as any)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="city">City</option>
+                    <option value="sunset">Sunset</option>
+                    <option value="dawn">Dawn</option>
+                    <option value="night">Night</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="forest">Forest</option>
+                    <option value="apartment">Apartment</option>
+                    <option value="studio">Studio</option>
+                    <option value="park">Park</option>
+                    <option value="lobby">Lobby</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lighting Intensity: {contrast.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.1"
+                    value={contrast}
+                    onChange={(e) => setContrast(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Dim</span>
+                    <span>Very Bright</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Exposure: {exposure.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.5"
+                    step="0.1"
+                    value={exposure}
+                    onChange={(e) => setExposure(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Dark</span>
+                    <span>Very Bright</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="w-full h-[500px] bg-gradient-to-b from-gray-900 to-gray-800 rounded-lg overflow-hidden relative">
               {glbUrl ? (
                 <>
@@ -153,7 +232,10 @@ export default function TrellisPage() {
                     <color attach="background" args={["#1a1a2e"]} />
 
                     {/* HDR Environment for PBR materials */}
-                    <Environment preset="city" background={false} />
+                    <Environment
+                      preset={environmentPreset}
+                      background={false}
+                    />
 
                     {/* Additional subtle lighting with contrast control */}
                     <ambientLight intensity={0.5 * contrast} />
@@ -262,7 +344,7 @@ export default function TrellisPage() {
 
                     {/* Increase Contrast */}
                     <button
-                      onClick={() => setContrast(Math.min(contrast + 0.3, 3.0))}
+                      onClick={() => setContrast(Math.min(contrast + 0.3, 5.0))}
                       className="w-12 h-12 bg-gray-800/80 hover:bg-gray-700 border border-gray-600 rounded-lg flex items-center justify-center text-white transition backdrop-blur-sm"
                       title="Increase Contrast"
                     >
