@@ -27,7 +27,9 @@ export default function Home() {
     new Set()
   );
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
-  const [extractedIngredients, setExtractedIngredients] = useState<Ingredient[]>([]);
+  const [extractedIngredients, setExtractedIngredients] = useState<
+    Ingredient[]
+  >([]);
 
   const presets = [
     {
@@ -113,7 +115,7 @@ export default function Home() {
       try {
         const phase1Response = await handlePhase1(initialMessage);
         const assistantId = (Date.now() + 1).toString();
-        
+
         setMessages((prev) => [
           ...prev,
           {
@@ -132,7 +134,8 @@ export default function Home() {
           ...prev,
           {
             role: "assistant",
-            content: "I'm sorry, I encountered an error analyzing your materials. Please try again.",
+            content:
+              "I'm sorry, I encountered an error analyzing your materials. Please try again.",
             id: assistantId,
           },
         ]);
@@ -159,7 +162,7 @@ export default function Home() {
     try {
       const phase1Response = await handlePhase1(chatInput);
       const assistantId = (Date.now() + 1).toString();
-      
+
       setMessages((prev) => [
         ...prev,
         {
@@ -242,7 +245,9 @@ export default function Home() {
                   <div key={message.id}>
                     <div
                       className={`flex ${
-                        message.role === "user" ? "justify-end" : "justify-start"
+                        message.role === "user"
+                          ? "justify-end"
+                          : "justify-start"
                       }`}
                     >
                       <div
@@ -263,7 +268,7 @@ export default function Home() {
                         {message.content}
                       </div>
                     </div>
-                    
+
                     {/* Render Phase 1 data if present */}
                     {message.phase1Data && (
                       <div className="mt-4 space-y-4">
@@ -273,52 +278,70 @@ export default function Home() {
                             📦 Extracted Materials
                           </h3>
                           <div className="space-y-2">
-                            {message.phase1Data.ingredients.map((ingredient, idx) => (
-                              <div key={idx} className="bg-[#232937] rounded p-3 border border-[#2A3142]">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <span className="text-white font-medium">
-                                      {ingredient.name || "Unknown"}
-                                    </span>
-                                    <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3">
-                                      <span>Material: {ingredient.material || "N/A"}</span>
-                                      {ingredient.size && <span>Size: {ingredient.size}</span>}
-                                      {ingredient.condition && (
-                                        <span>Condition: {ingredient.condition}</span>
-                                      )}
+                            {message.phase1Data.ingredients.map(
+                              (ingredient, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-[#232937] rounded p-3 border border-[#2A3142]"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <span className="text-white font-medium">
+                                        {ingredient.name || "Unknown"}
+                                      </span>
+                                      <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3">
+                                        <span>
+                                          Material:{" "}
+                                          {ingredient.material || "N/A"}
+                                        </span>
+                                        {ingredient.size && (
+                                          <span>Size: {ingredient.size}</span>
+                                        )}
+                                        {ingredient.condition && (
+                                          <span>
+                                            Condition: {ingredient.condition}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded ml-2 ${
+                                        ingredient.confidence >= 0.8
+                                          ? "bg-green-900 text-green-200"
+                                          : ingredient.confidence >= 0.6
+                                          ? "bg-yellow-900 text-yellow-200"
+                                          : "bg-red-900 text-red-200"
+                                      }`}
+                                    >
+                                      {Math.round(ingredient.confidence * 100)}%
+                                    </span>
                                   </div>
-                                  <span
-                                    className={`text-xs px-2 py-1 rounded ml-2 ${
-                                      ingredient.confidence >= 0.8
-                                        ? "bg-green-900 text-green-200"
-                                        : ingredient.confidence >= 0.6
-                                        ? "bg-yellow-900 text-yellow-200"
-                                        : "bg-red-900 text-red-200"
-                                    }`}
-                                  >
-                                    {Math.round(ingredient.confidence * 100)}%
-                                  </span>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            )}
                           </div>
                         </div>
 
                         {/* Clarifying Questions */}
                         {message.phase1Data.needs_clarification &&
                           message.phase1Data.clarifying_questions &&
-                          message.phase1Data.clarifying_questions.length > 0 && (
+                          message.phase1Data.clarifying_questions.length >
+                            0 && (
                             <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
                               <h3 className="text-yellow-400 text-lg font-semibold mb-2">
                                 ❓ Need More Information
                               </h3>
                               <ul className="space-y-2">
-                                {message.phase1Data.clarifying_questions.map((question, idx) => (
-                                  <li key={idx} className="text-yellow-200 text-sm">
-                                    • {question}
-                                  </li>
-                                ))}
+                                {message.phase1Data.clarifying_questions.map(
+                                  (question, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-yellow-200 text-sm"
+                                    >
+                                      • {question}
+                                    </li>
+                                  )
+                                )}
                               </ul>
                             </div>
                           )}
@@ -338,8 +361,12 @@ export default function Home() {
                                   animation: "fadeIn 0.5s ease-out forwards",
                                 }}
                               >
-                                <h4 className="text-white font-semibold mb-1">{idea.title}</h4>
-                                <p className="text-gray-400 text-sm">{idea.one_liner}</p>
+                                <h4 className="text-white font-semibold mb-1">
+                                  {idea.title}
+                                </h4>
+                                <p className="text-gray-400 text-sm">
+                                  {idea.one_liner}
+                                </p>
                               </div>
                             ))}
                           </div>
@@ -391,7 +418,7 @@ export default function Home() {
 
   // Initial Form UI
   return (
-    <div className="min-h-screen bg-[#181A25] overflow-hidden">
+    <div className="min-h-screen bg-[#181A25] overflow-hidden font-menlo">
       {/* Header */}
       <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
         <Image
@@ -429,7 +456,7 @@ export default function Home() {
         {/* Title */}
         <div className="overflow-hidden">
           <h1
-            className="text-5xl font-light text-white mb-2 transition-all duration-500 ease-out"
+            className="text-4xl text-white mb-2 transition-all duration-500 ease-out"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
