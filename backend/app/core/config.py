@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     
     # API keys
     TRELLIS_API_KEY: Optional[str] = Field(default=os.getenv("TRELLIS_API_KEY", None))
+    REPLICATE_API_KEY: Optional[str] = Field(default=os.getenv("REPLICATE_API_KEY", None))
     GEMINI_API_KEY: Optional[str] = Field(default=os.getenv("GEMINI_API_KEY", None))
 
     class Config:
