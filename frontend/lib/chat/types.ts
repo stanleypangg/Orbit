@@ -50,7 +50,50 @@ export interface Phase1Response {
   ideas: Idea[];
 }
 
-// Phase 2 Types
+// Project Context Types (Persistent)
+export interface ChosenIdea {
+  id: string;
+  name: string;
+  short_scope: string;
+  end_product_description: string;
+}
+
+export interface ProjectContext {
+  assumptions: string[];
+  clarifications: { [question: string]: string };
+  confidence: number;
+  chosen_idea: ChosenIdea | null;
+}
+
+// Requirements Loop Types
+export interface RequirementsResponse {
+  ingredients: Ingredient[];
+  confidence: number;
+  needs_clarification: boolean;
+  clarifying_questions?: string[];
+  assumptions?: string[];
+}
+
+// Ideation Draft Types (Ephemeral)
+export interface DraftImage {
+  url: string;
+  seed: number | null;
+  notes: string;
+}
+
+export interface IdeationDraft {
+  id: string;
+  name: string;
+  one_liner: string;
+  assumptions: string[];
+  draft_image?: DraftImage;
+}
+
+export interface IdeationDraftsResponse {
+  drafts: IdeationDraft[];
+}
+
+// Refined Imaging Types
 export interface Camera {
   view: 'front' | 'three-quarter' | 'top' | 'detail';
   focal_length_mm?: number;
@@ -71,6 +114,24 @@ export interface RenderConfig {
   seed?: number | null;
 }
 
+export interface RefinedBrief {
+  idea_id: string;
+  prompt: string;
+  negative_prompt?: string;
+  camera: Camera;
+  lighting?: string;
+  background?: string;
+  render: RenderConfig;
+  acceptance_criteria?: string[];
+}
+
+export interface SelectionResponse {
+  refined_image_url: string;
+  brief: RefinedBrief;
+  context_summary: ChosenIdea;
+}
+
+// Phase 2 Types (Legacy - for backward compatibility)
 export interface Phase2Response {
   idea_id: string;
   prompt: string;
