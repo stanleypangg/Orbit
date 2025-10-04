@@ -7,22 +7,24 @@ A minimal, production-ready chatbot powered by Google's Gemini API with real-tim
 ### Quick Start
 
 1. **Backend Setup**:
+
    ```bash
    cd backend
-   
+
    # Create .env file with your Gemini API key
    echo "GEMINI_API_KEY=your_key_here" > .env
    echo "GEMINI_MODEL=gemini-1.5-pro" >> .env
-   
+
    # Option A: Local Python
    pip install -r requirements.txt
    uvicorn main:app --reload --port 8000
-   
+
    # Option B: Docker
    docker-compose up --build
    ```
 
 2. **Frontend Setup**:
+
    ```bash
    cd frontend
    npm install
@@ -34,6 +36,7 @@ A minimal, production-ready chatbot powered by Google's Gemini API with real-tim
 ### Documentation
 
 See [CHATBOT_SETUP.md](./CHATBOT_SETUP.md) for detailed documentation including:
+
 - Architecture overview
 - API reference
 - Configuration options
@@ -49,7 +52,7 @@ See [CHATBOT_SETUP.md](./CHATBOT_SETUP.md) for detailed documentation including:
 ✅ Error handling and loading states  
 ✅ Keyboard shortcuts (Enter to send, Shift+Enter for newline)  
 ✅ Auto-scroll and focus management  
-✅ Request telemetry and logging  
+✅ Request telemetry and logging
 
 ---
 
@@ -110,19 +113,40 @@ The backend will run on `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 
+## Features
+
+### Trellis 3D Generator
+
+A proof of concept that demonstrates image-to-3D model generation:
+
+- Upload an image via the web interface
+- Generate 3D models using the Trellis API
+- View and interact with the generated GLB model in real-time using Three.js
+- Download the generated 3D model
+
+Access at: `http://localhost:3000/trellis`
+
 ## Project Structure
 
 ```
 HTV/
-├── frontend/           # Next.js application
-│   ├── app/           # Next.js App Router
-│   ├── public/        # Static assets
-│   └── ...
-└── backend/           # FastAPI application
+├── frontend/              # Next.js application
+│   ├── app/              # Next.js App Router
+│   │   ├── trellis/      # Trellis 3D generator POC
+│   │   └── ...
+│   ├── lib/              # Utilities
+│   ├── components/       # React components
+│   └── public/           # Static assets
+└── backend/              # FastAPI application
     ├── app/
-    │   └── domains/   # Domain-based modules
-    │       └── example/
-    ├── main.py        # FastAPI entry point
-    ├── Dockerfile     # Docker configuration
+    │   ├── endpoints/    # API endpoints
+    │   │   ├── redis/    # Redis operations
+    │   │   ├── trellis/  # Trellis 3D generation
+    │   │   └── ...
+    │   ├── integrations/ # Third-party API integrations
+    │   │   └── trellis.py
+    │   └── core/         # Core services (config, redis)
+    ├── main.py           # FastAPI entry point
+    ├── Dockerfile        # Docker configuration
     └── requirements.txt
 ```

@@ -21,8 +21,12 @@ class Settings(BaseSettings):
     TRELLIS_API_KEY: Optional[str] = Field(default=os.getenv("TRELLIS_API_KEY", None))
     REPLICATE_API_KEY: Optional[str] = Field(default=os.getenv("REPLICATE_API_KEY", None))
     GEMINI_API_KEY: Optional[str] = Field(default=os.getenv("GEMINI_API_KEY", None))
+    
+    # Gemini settings
+    GEMINI_MODEL: str = Field(default=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env
 
 settings = Settings()
