@@ -992,12 +992,21 @@ async def run_workflow_background(thread_id: str, user_input: str):
         # Store ingredients if present
         if result.get("result") and result["result"].get("ingredients_data"):
             ingredients_key = f"ingredients:{thread_id}"
+            # Serialize the Pydantic object first
+            ing_data = result["result"]["ingredients_data"]
+            if hasattr(ing_data, "model_dump"):
+                # It's a Pydantic model, convert it
+                ing_dict = ing_data.model_dump()
+            else:
+                # Already a dict
+                ing_dict = ing_data
+            
             ingredients_data = {
-                "ingredients": result["result"]["ingredients_data"].get("ingredients", []),
-                "categories": result["result"]["ingredients_data"].get("categories", {}),
-                "confidence": result["result"]["ingredients_data"].get("confidence", 0.8),
-                "needs_clarification": result["result"]["ingredients_data"].get("needs_clarification", False),
-                "clarification_questions": result["result"]["ingredients_data"].get("clarification_questions", [])
+                "ingredients": ing_dict.get("ingredients", []),
+                "categories": ing_dict.get("categories", {}),
+                "confidence": ing_dict.get("confidence", 0.8),
+                "needs_clarification": ing_dict.get("needs_clarification", False),
+                "clarification_questions": ing_dict.get("clarification_questions", [])
             }
             redis_service.set(ingredients_key, json.dumps(ingredients_data), ex=3600)
             logger.info(f"Stored ingredients for {thread_id}")

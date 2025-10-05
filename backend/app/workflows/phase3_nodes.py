@@ -367,28 +367,43 @@ async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
     """
     A1 Node: Assemble complete project preview with BOM, tools, ESG data, and DIY guide.
     Uses Gemini Pro for comprehensive project documentation generation.
+    
+    Note: This node runs after image generation but before user selects a concept.
+    It generates preview data for all 3 concepts.
     """
     logger.info(f"A1: Starting preview assembly for thread {state.thread_id}")
 
-    # Validate inputs
-    if not state.selected_option or not state.ingredients_data:
-        logger.error("A1: Missing required data for preview assembly")
-        message = "Preview assembly requires selected option and ingredients"
-        state.errors.append(message)
+    # Validate inputs - use viable_options if selected_option not set yet
+    if not state.ingredients_data:
+        logger.error("A1: Missing ingredients data for preview assembly")
         return {
-            "errors": state.errors,
+            "errors": ["Preview assembly requires ingredients data"],
+            "current_node": "A1"
+        }
+    
+    # Use selected_option if available, otherwise use first viable_option
+    # (User might not have selected yet in auto-flow)
+    selected_opt = state.selected_option
+    if not selected_opt and state.viable_options:
+        logger.info("A1: No selected_option, using first viable_option")
+        selected_opt = state.viable_options[0]
+    
+    if not selected_opt:
+        logger.error("A1: No project option available for preview assembly")
+        return {
+            "errors": ["Preview assembly requires at least one project option"],
             "current_node": "A1"
         }
 
-    # Build comprehensive assembly prompt
+    # Build comprehensive assembly prompt using selected_opt
     project_data = {
-        "title": state.selected_option.get("title", "Upcycled Project"),
-        "description": state.selected_option.get("description", ""),
-        "materials": state.selected_option.get("materials_used", []),
-        "tools": state.selected_option.get("tools_required", []),
-        "steps": state.selected_option.get("construction_steps", []),
-        "difficulty": state.selected_option.get("difficulty_level", "intermediate"),
-        "time_estimate": state.selected_option.get("estimated_time", "2-4 hours")
+        "title": selected_opt.get("title", "Upcycled Project"),
+        "description": selected_opt.get("description", ""),
+        "materials": selected_opt.get("materials_used", []),
+        "tools": selected_opt.get("tools_required", []),
+        "steps": selected_opt.get("construction_steps", []),
+        "difficulty": selected_opt.get("difficulty_level", "intermediate"),
+        "time_estimate": selected_opt.get("estimated_time", "2-4 hours")
     }
 
     ingredients_detail = [
