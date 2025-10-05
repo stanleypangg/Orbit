@@ -9,11 +9,12 @@ import asyncio
 from typing import Dict, Any, List, Optional
 import os
 import google.generativeai as genai
-from app.workflows.state import WorkflowState, ConceptVariant
+from app.workflows.state import WorkflowState, ConceptVariant, StepImage
 from app.ai_service.production_gemini import call_gemini_with_retry as production_call_gemini
 from app.core.config import settings
 from app.core.redis import redis_service
 from app.knowledge.material_affordances import material_kb, MaterialType
+from app.workflows.step_image_generator import get_step_image_generator
 import httpx
 import base64
 from io import BytesIO
@@ -624,6 +625,32 @@ async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
             assembly_key = f"assembly:{state.thread_id}"
             redis_service.set(assembly_key, json.dumps(assembly_data), ex=7200)
 
+            # NEW: Trigger background step image generation (don't await!)
+            construction_steps = assembly_data.get("construction_steps", [])
+            if construction_steps and len(construction_steps) > 0:
+                logger.info(f"A1: Triggering background generation for {len(construction_steps)} step images")
+                
+                # Initialize step images in state
+                state.step_images = [
+                    StepImage(step_number=i+1, status="pending")
+                    for i in range(len(construction_steps))
+                ]
+                state.step_images_status = "generating"
+                state.step_images_progress = 0.0
+                
+                # Launch background task (fire and forget)
+                asyncio.create_task(
+                    generate_step_images_background(
+                        thread_id=state.thread_id,
+                        project_preview=assembly_data,
+                        selected_option=state.selected_option or {},
+                        selected_concept=state.selected_concept,
+                        ingredients=state.ingredients_data.ingredients if state.ingredients_data else []
+                    )
+                )
+                
+                logger.info("A1: Background step image generation started")
+
             state.current_node = "COMPLETE"
             state.current_phase = "complete"
 
@@ -633,6 +660,8 @@ async def preview_assembly_node(state: WorkflowState) -> Dict[str, Any]:
                 "final_output": state.final_output,
                 "esg_report": state.esg_report,
                 "bom_data": state.bom_data,
+                "step_images": state.step_images,  # Return initial state
+                "step_images_status": state.step_images_status,
                 "current_node": "COMPLETE",
                 "current_phase": "complete"
             }
@@ -839,6 +868,72 @@ def should_proceed_to_magic_pencil(state: WorkflowState) -> str:
     # For now, always proceed to packaging after assembly
     # In production, this would check for user edit requests
     return "packaging"
+
+
+async def generate_step_images_background(
+    thread_id: str,
+    project_preview: Dict[str, Any],
+    selected_option: Dict[str, Any],
+    selected_concept: Optional[ConceptVariant],
+    ingredients: List[Any]
+):
+    """
+    Background task to generate step images.
+    This runs independently and updates Redis as it progresses.
+    """
+    try:
+        logger.info(f"BACKGROUND: Starting step image generation for thread {thread_id}")
+        
+        # Extract data
+        project_overview = project_preview.get("project_overview", {})
+        construction_steps = project_preview.get("construction_steps", [])
+        
+        project_title = project_overview.get("title", "Upcycled Project")
+        project_description = project_overview.get("description", "")
+        
+        materials = [ing.name for ing in ingredients if hasattr(ing, 'name') and ing.name] if ingredients else []
+        
+        # Get selected concept's image prompt for style consistency
+        concept_prompt = None
+        if selected_concept and hasattr(selected_concept, 'image_prompt'):
+            concept_prompt = selected_concept.image_prompt
+        
+        # Generate all step images
+        generator = get_step_image_generator()
+        step_images = await generator.generate_all_step_images(
+            thread_id=thread_id,
+            project_title=project_title,
+            project_description=project_description,
+            materials=materials,
+            construction_steps=construction_steps,
+            selected_concept_image_prompt=concept_prompt,
+            max_concurrent=1  # Sequential generation for consistency
+        )
+        
+        # Store final results in Redis
+        results_key = f"step_images:final:{thread_id}"
+        results_data = {
+            "step_images": [img.model_dump() for img in step_images],
+            "status": "completed",
+            "generated_at": time.time()
+        }
+        redis_service.set(results_key, json.dumps(results_data), ex=7200)
+        
+        logger.info(f"BACKGROUND: ✓ Step image generation completed for thread {thread_id}")
+        
+    except Exception as e:
+        logger.error(f"BACKGROUND: Error in step image generation: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        # Update progress with error
+        progress_key = f"step_images:progress:{thread_id}"
+        error_data = {
+            "status": "failed",
+            "error": str(e),
+            "failed_at": time.time()
+        }
+        redis_service.set(progress_key, json.dumps(error_data), ex=7200)
 
 
 # API-specific helper functions

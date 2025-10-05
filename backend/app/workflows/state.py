@@ -59,6 +59,16 @@ class IngredientsData(BaseModel):
         return any(ingredient.has_null_fields() for ingredient in self.ingredients)
 
 
+class StepImage(BaseModel):
+    """Image for a specific construction step."""
+    step_number: int
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    status: str = "pending"  # pending, generating, completed, failed
+    generated_at: Optional[float] = None
+    prompt_used: Optional[str] = None
+
+
 class ConceptVariant(BaseModel):
     """A single concept variation for the upcycled product."""
     style: str  # minimalist, decorative, functional
@@ -137,6 +147,11 @@ class WorkflowState(BaseModel):
     edit_requests: List[str] = Field(default_factory=list)
     concept_images: Optional[Dict[str, Any]] = None
     project_preview: Optional[Dict[str, Any]] = None
+
+    # Step-by-step images (Phase 3/4)
+    step_images: List[StepImage] = Field(default_factory=list)
+    step_images_status: str = "not_started"  # not_started, generating, completed, failed
+    step_images_progress: float = 0.0  # 0.0 to 1.0
 
     # Output assembly (Phase 4)
     final_output: Optional[Dict[str, Any]] = None

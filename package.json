@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "codex": "^0.2.3"
+    "codex": "^0.2.3",
+    "lucide-react": "^0.544.0"
   }
 }
