@@ -8,6 +8,9 @@ import ModelViewer from "@/components/ProductDetail/ModelViewer";
 import MaterialsCarousel from "@/components/ProductDetail/MaterialsCarousel";
 import Storyboard from "@/components/ProductDetail/Storyboard";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 // Mock data - replace with actual props or API data
 const productData = {
   name: "Ocean Drop Earring",
@@ -139,7 +142,9 @@ export default function ProductDetail() {
         // Add timestamp to prevent caching issues
         const timestamp = Date.now();
         const response = await fetch(
-          `http://localhost:8000/trellis/generate?_t=${timestamp}`,
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+          }/trellis/generate?_t=${timestamp}`,
           {
             method: "POST",
             headers: {
