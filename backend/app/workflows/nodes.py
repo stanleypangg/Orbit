@@ -225,6 +225,17 @@ async def ingredient_extraction_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini 2.5 Flash for fast, structured parsing.
     """
     logger.info(f"P1a: Starting ingredient extraction for thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    import json
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "ingredient_discovery",
+        "current_node": "P1a_extract",
+        "result": {}
+    }), ex=3600)
 
     # Build extraction prompt with input sanitization protection
     extraction_prompt = f"""
@@ -310,6 +321,17 @@ async def null_checker_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini 2.5 Flash for quick question generation.
     """
     logger.info(f"P1b: Checking for null fields in thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    import json
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "ingredient_discovery",
+        "current_node": "P1b_null_check",
+        "result": {}
+    }), ex=3600)
 
     # Check clarification retry count to prevent infinite loops
     clarification_count = getattr(state, '_clarification_retry_count', 0)
@@ -411,6 +433,17 @@ async def ingredient_categorizer_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini 2.5 Flash for pattern recognition and categorization.
     """
     logger.info(f"P1c: Categorizing ingredients for thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    import json
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "ingredient_discovery",
+        "current_node": "P1c_categorize",
+        "result": {}
+    }), ex=3600)
 
     # Load current ingredients from Redis
     ingredients_data = load_ingredients_from_redis(state.thread_id)

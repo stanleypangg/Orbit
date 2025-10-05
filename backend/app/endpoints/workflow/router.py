@@ -129,16 +129,31 @@ async def stream_workflow(thread_id: str):
                 if ingredient_data:
                     ingredients = json.loads(ingredient_data)
                     yield f"data: {json.dumps({'type': 'ingredients_update', 'data': ingredients})}\n\n"
+                    
+                    # Check if there are clarification questions in ingredients data
+                    if ingredients.get("needs_clarification") and ingredients.get("clarification_questions"):
+                        questions = ingredients["clarification_questions"]
+                        # Send as user_question event
+                        yield f"data: {json.dumps({'type': 'user_question', 'data': questions})}\n\n"
 
-                # Check for user questions/interrupts
-                question_key = f"questions:{thread_id}"
-                questions_data = redis_service.get(question_key)
+                # Also check workflow state for user_questions (alternative location)
+                if state_data:
+                    state_obj = json.loads(state_data) if isinstance(state_data, str) else state_data
+                    result = state_obj.get("result", {})
+                    if result.get("needs_user_input") and result.get("user_questions"):
+                        questions = result["user_questions"]
+                        yield f"data: {json.dumps({'type': 'user_question', 'data': questions})}\n\n"
 
-                if questions_data:
-                    questions = json.loads(questions_data)
-                    yield f"data: {json.dumps({'type': 'user_question', 'data': questions})}\n\n"
-                    # Clear questions after sending
-                    redis_service.delete(question_key)
+                # Check for project choices (Phase 2: O1 node output)
+                choices_key = f"choices:{thread_id}"
+                choices_data = redis_service.get(choices_key)
+
+                if choices_data:
+                    choices = json.loads(choices_data)
+                    if not choices.get("sent", False):
+                        yield f"data: {json.dumps({'type': 'choices_generated', 'data': choices})}\n\n"
+                        choices["sent"] = True
+                        redis_service.set(choices_key, json.dumps(choices), ex=3600)
 
                 # Check for concept generation updates
                 concepts_key = f"concepts:{thread_id}"
@@ -498,6 +513,68 @@ async def magic_pencil_edit(
         raise HTTPException(status_code=500, detail=f"Failed to initiate edit: {e}")
 
 
+class OptionSelectionRequest(BaseModel):
+    """Request to select a project option."""
+    option_id: str = Field(..., description="ID of selected option")
+
+
+@router.post("/select-option/{thread_id}")
+async def select_option(
+    thread_id: str,
+    request: OptionSelectionRequest,
+    background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
+    """
+    Select a project option and proceed to Phase 3.
+    """
+    try:
+        # Get current choices
+        choices_key = f"choices:{thread_id}"
+        choices_data = redis_service.get(choices_key)
+
+        if not choices_data:
+            raise HTTPException(status_code=404, detail="No choices found")
+
+        choices = json.loads(choices_data)
+        viable_options = choices.get("viable_options", [])
+
+        # Find the selected option
+        selected_option = next((opt for opt in viable_options if opt.get("option_id") == request.option_id), None)
+
+        if not selected_option:
+            raise HTTPException(status_code=404, detail="Option not found")
+
+        # Store selection
+        selection_key = f"option_selection:{thread_id}"
+        selection_data = {
+            "option_id": request.option_id,
+            "selected_option": selected_option,
+            "timestamp": time.time()
+        }
+        redis_service.set(selection_key, json.dumps(selection_data), ex=3600)
+
+        # Update workflow state to proceed to Phase 3
+        state_key = f"workflow_state:{thread_id}"
+        state_data = redis_service.get(state_key)
+        if state_data:
+            state = json.loads(state_data)
+            state["selected_option"] = selected_option
+            state["current_phase"] = "concept_generation"
+            state["current_node"] = "PR1"
+            redis_service.set(state_key, json.dumps(state), ex=3600)
+
+        return {
+            "message": "Option selected successfully",
+            "option_id": request.option_id,
+            "status": "proceeding_to_concept_generation"
+        }
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid choices data")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to select option: {e}")
+
+
 @router.post("/select-concept/{thread_id}")
 async def select_concept(
     thread_id: str,
@@ -819,26 +896,56 @@ async def health_check() -> Dict[str, str]:
 
 # Background task functions
 async def run_workflow_background(thread_id: str, user_input: str):
-    """Run workflow in background task."""
+    """Run workflow in background task with progress tracking."""
     try:
         import logging
+        import asyncio
         logger = logging.getLogger(__name__)
         logger.info(f"Starting workflow background task for {thread_id}")
         
-        result = await workflow_orchestrator.start_workflow(thread_id, user_input)
+        # Initialize workflow state
+        state_key = f"workflow_state:{thread_id}"
+        initial_state = {
+            "status": "running",
+            "current_phase": "ingredient_discovery",
+            "current_node": "P1a_extract",
+            "result": {}
+        }
+        redis_service.set(state_key, json.dumps(initial_state), ex=3600)
         
+        # Run workflow with progress monitoring
+        workflow_task = asyncio.create_task(
+            workflow_orchestrator.start_workflow(thread_id, user_input)
+        )
+        
+        # Monitor progress while workflow runs
+        while not workflow_task.done():
+            await asyncio.sleep(0.5)  # Poll every 500ms
+            
+            # Update state from Redis if nodes are updating it
+            # The nodes themselves will update the state
+        
+        result = await workflow_task
         logger.info(f"Workflow result: {result}")
 
-        # Store workflow state updates
-        state_key = f"workflow_state:{thread_id}"
-        redis_service.set(state_key, json.dumps(result), ex=3600)
+        # Store final workflow state
+        final_state = {
+            "status": result.get("status", "complete"),
+            "current_phase": result.get("result", {}).get("current_phase", "complete"),
+            "current_node": result.get("result", {}).get("current_node", "END"),
+            "result": result.get("result", {})
+        }
+        redis_service.set(state_key, json.dumps(final_state), ex=3600)
         
         # Store ingredients if present
         if result.get("result") and result["result"].get("ingredients_data"):
             ingredients_key = f"ingredients:{thread_id}"
             ingredients_data = {
                 "ingredients": result["result"]["ingredients_data"].get("ingredients", []),
-                "categories": result["result"]["ingredients_data"].get("categories", {})
+                "categories": result["result"]["ingredients_data"].get("categories", {}),
+                "confidence": result["result"]["ingredients_data"].get("confidence", 0.8),
+                "needs_clarification": result["result"]["ingredients_data"].get("needs_clarification", False),
+                "clarification_questions": result["result"]["ingredients_data"].get("clarification_questions", [])
             }
             redis_service.set(ingredients_key, json.dumps(ingredients_data), ex=3600)
             logger.info(f"Stored ingredients for {thread_id}")

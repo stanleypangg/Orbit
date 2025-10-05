@@ -177,6 +177,12 @@ class ProductionGeminiClient:
             Dict containing the response and metadata
         """
         max_retries = max_retries or settings.GEMINI_MAX_RETRIES
+        
+        # Add explicit JSON formatting instruction if schema provided
+        if response_schema:
+            prompt = f"""{prompt}
+
+IMPORTANT: Respond with ONLY valid JSON matching the required schema. Do not include markdown formatting, code blocks, or any text outside the JSON object."""
 
         # Choose optimal model
         if self._should_use_flash(task_type, len(prompt)):
@@ -188,22 +194,23 @@ class ProductionGeminiClient:
 
         # Get optimized generation config
         generation_config = self._get_generation_config(task_type)
+        
+        # IMPORTANT: Add schema to config BEFORE creating model
+        if response_schema:
+            generation_config.update({
+                "response_mime_type": "application/json",
+                "response_schema": response_schema
+            })
 
         for attempt in range(max_retries):
             try:
                 async with self._request_context(f"call_gemini_retry_attempt_{attempt + 1}"):
+                    # Create model with schema-enabled config
                     model = genai.GenerativeModel(
                         model_name=model_name,
                         generation_config=generation_config,
                         safety_settings=self.safety_settings,
                     )
-
-                    if response_schema:
-                        # Use structured output if schema provided
-                        generation_config.update({
-                            "response_mime_type": "application/json",
-                            "response_schema": response_schema
-                        })
 
                     # Use asyncio.wait_for to ensure proper cleanup
                     # Get task-specific timeout
@@ -244,10 +251,40 @@ class ProductionGeminiClient:
                             return result
 
                         except json.JSONDecodeError as e:
+                            # With proper schema config, this should rarely happen
+                            logger.warning(f"JSON parse error on attempt {attempt + 1}: {str(e)}")
+                            
+                            # Try basic cleanup as fallback
+                            try:
+                                cleaned_text = response.text.strip()
+                                # Remove markdown code blocks if present
+                                if cleaned_text.startswith("```"):
+                                    lines = cleaned_text.split("\n")
+                                    cleaned_text = "\n".join(lines[1:-1]) if len(lines) > 2 else cleaned_text
+                                
+                                result = json.loads(cleaned_text)
+                                logger.info("✅ Parsed JSON after cleaning markdown (schema should prevent this)")
+                                
+                                result["_metadata"] = {
+                                    "model_used": model_name,
+                                    "task_type": task_type,
+                                    "attempt": attempt + 1,
+                                    "tokens_estimated": len(response.text) // 4,
+                                    "safety_ratings": getattr(response, 'safety_ratings', []),
+                                    "cleaned": True
+                                }
+                                
+                                self.total_tokens += result["_metadata"]["tokens_estimated"]
+                                await self._cache_response(prompt, result, task_type)
+                                return result
+                                
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to parse even after cleaning. Raw response: {response.text[:500]}")
+                            
                             if attempt == max_retries - 1:
-                                return {"error": f"Invalid JSON response: {str(e)}"}
+                                return {"error": f"Invalid JSON response after {max_retries} attempts: {str(e)}"}
                             else:
-                                logger.warning(f"JSON parse error on attempt {attempt + 1}, retrying...")
+                                await asyncio.sleep(1)  # Short delay before retry
                                 continue
                     else:
                         if attempt == max_retries - 1:
