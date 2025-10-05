@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Ingredient } from '@/lib/chat/types';
+import { getProxiedImageUrl } from '@/lib/utils/imageProxy';
 
 interface WorkflowOption {
   option_id: string;
@@ -188,7 +189,7 @@ export function useWorkflow({
             const progressConcept = {
               concept_id: data.data.concept_id || `concept_${Date.now()}`,
               title: data.data.title || 'Concept',
-              image_url: data.data.image_url || data.data.url || '',
+              image_url: getProxiedImageUrl(data.data.image_url || data.data.url || ''),
               description: data.data.description,
               style: data.data.style,
             };
@@ -222,7 +223,7 @@ export function useWorkflow({
             const mappedConcepts = concepts.map((c: any, idx: number) => ({
               concept_id: c.concept_id || `concept_${idx}`,
               title: c.title || c.style || `Concept ${idx + 1}`,
-              image_url: c.image_url || c.url || '',
+              image_url: getProxiedImageUrl(c.image_url || c.url || ''),
               description: c.description,
               style: c.style,
             }));

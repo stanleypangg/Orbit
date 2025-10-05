@@ -325,8 +325,9 @@ export default function Home() {
     selectConcept(conceptId); // No await - runs in background
 
     // Immediately navigate to Magic Pencil with the hero image
+    // Note: image_url is already proxied via useWorkflow for optimal caching
     const params = new URLSearchParams({
-      imageUrl: selectedConcept.image_url,
+      imageUrl: selectedConcept.image_url, // Already proxied: /api/images/{imageId}
       title: selectedConcept.title,
       threadId: workflowState.threadId || "",
       conceptId: conceptId,

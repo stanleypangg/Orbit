@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { getProxiedImageUrl } from "@/lib/utils/imageProxy";
 
 interface Point {
   x: number;
@@ -18,10 +19,14 @@ export default function MagicPencilPage() {
   const searchParams = useSearchParams();
 
   // Get hero image from workflow or fallback to demo image
-  const imageUrl =
+  const rawImageUrl =
     searchParams.get("imageUrl") ||
     searchParams.get("image") ||
     "/pikachu.webp";
+  
+  // IMPORTANT: Convert backend URLs to proxied URLs for caching + CORS
+  const imageUrl = getProxiedImageUrl(rawImageUrl);
+  
   const projectTitle = searchParams.get("title") || "Your Project";
   const threadId = searchParams.get("threadId");
   const conceptId = searchParams.get("conceptId");
@@ -63,10 +68,17 @@ export default function MagicPencilPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
+      console.log('[Magic Pencil] Loading image:', uploadedImage);
+      
       const img = new window.Image();
-      img.crossOrigin = "anonymous"; // Enable CORS for external images
+      // No need for CORS when using proxy URL (same-origin)
+      if (!uploadedImage.startsWith('/')) {
+        img.crossOrigin = "anonymous";
+      }
       img.src = uploadedImage;
+      
       img.onload = () => {
+        console.log('[Magic Pencil] ✓ Image loaded successfully:', uploadedImage);
         canvas.width = img.width;
         canvas.height = img.height;
 
@@ -79,8 +91,10 @@ export default function MagicPencilPage() {
         setHistoryIndex(0);
       };
 
-      img.onerror = () => {
-        console.error("Failed to load image:", uploadedImage);
+      img.onerror = (e) => {
+        console.error('[Magic Pencil] ❌ Failed to load image:', uploadedImage);
+        console.error('[Magic Pencil] Error details:', e);
+        console.error('[Magic Pencil] Is proxied?', uploadedImage.startsWith('/api/images/'));
       };
     }
   }, [uploadedImage]);
