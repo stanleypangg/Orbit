@@ -7,6 +7,7 @@ import ESGImpact from "@/components/ProductDetail/ESGImpact";
 import ModelViewer from "@/components/ProductDetail/ModelViewer";
 import MaterialsCarousel from "@/components/ProductDetail/MaterialsCarousel";
 import Storyboard from "@/components/ProductDetail/Storyboard";
+import ToolsAndMaterialsSection from "@/components/ProductDetail/ToolsAndMaterialsSection";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -20,6 +21,55 @@ const productData = {
     waterSaved: 0.04,
     sustainabilityScore: 96,
   },
+  toolsAndMaterials: [
+    { 
+      name: "Heat Gun", 
+      category: "tool" as const,
+      purpose: "Shape plastic pieces",
+      is_optional: false,
+      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
+        <path d="M14 4v16M10 4v16M6 8l12 8M6 16l12-8"/>
+      </svg>`
+    },
+    { 
+      name: "Wire Cutters", 
+      category: "tool" as const,
+      purpose: "Cut jewelry wire",
+      is_optional: false,
+      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5BA3D0" stroke-width="2">
+        <path d="M6 6l12 12M6 18L18 6M12 12L6 6M12 12l6 6"/>
+      </svg>`
+    },
+    { 
+      name: "Pliers", 
+      category: "tool" as const,
+      purpose: "Bend and shape wire",
+      is_optional: false,
+      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
+        <path d="M15 7l-6.5 6.5a2.12 2.12 0 1 0 3 3L18 10"/>
+        <path d="M9 10h.01M15 14h.01"/>
+      </svg>`
+    },
+    { 
+      name: "Jewelry Wire", 
+      category: "material" as const,
+      purpose: "Connect components",
+      is_optional: false,
+      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5BA3D0" stroke-width="2">
+        <path d="M3 12c0-2.8 1.7-5.3 4.2-6.4M21 12c0 2.8-1.7 5.3-4.2 6.4M9 18c-1.5-1-2.5-2.8-2.5-4.8M15 6c1.5 1 2.5 2.8 2.5 4.8"/>
+      </svg>`
+    },
+    { 
+      name: "Silver Hooks", 
+      category: "material" as const,
+      purpose: "Earring attachment",
+      is_optional: false,
+      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
+        <path d="M12 6v12M8 10l4-4 4 4"/>
+        <circle cx="12" cy="18" r="2"/>
+      </svg>`
+    },
+  ],
   materials: [
     { name: "Ocean Plastic", image: "/turtle.svg" },
     { name: "Silver Hooks", image: "/glass.svg" },
@@ -265,7 +315,7 @@ export default function ProductDetail() {
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-[1440px] mx-auto p-8">
         {/* Product Header */}
         <div className="mb-8">
           <h1 className="text-4xl text-white mb-2">{productData.name}</h1>
@@ -273,7 +323,7 @@ export default function ProductDetail() {
         </div>
 
         {/* Top Section: Model Viewer + ESG Impact Split */}
-        <div className="grid grid-cols-[3fr_2fr] gap-6 mb-8">
+        <div className="grid grid-cols-[7fr_5fr] gap-6 mb-8">
           {/* 3D Model Viewer - Square */}
           <div className="aspect-square">
           <ModelViewer
@@ -285,8 +335,8 @@ export default function ProductDetail() {
           
           {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
-            {/* Top: Radar Chart - Dynamic height */}
-            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded overflow-hidden flex flex-col items-center justify-center p-8">
+            {/* Top: Radar Chart - Square */}
+            <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#67B68B] overflow-hidden flex flex-col items-center justify-center p-8">
               <div className="w-full max-w-md">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -373,7 +423,7 @@ export default function ProductDetail() {
             {/* Bottom: Detailed Stats Breakdown - Horizontal Layout */}
             <div className="grid grid-cols-3 gap-4">
               {/* Carbon Impact Breakdown */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] rounded relative overflow-hidden p-4 flex flex-col">
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B]" />
@@ -428,7 +478,7 @@ export default function ProductDetail() {
               </div>
               
               {/* Water Conservation Breakdown */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#5BA3D0] rounded relative overflow-hidden p-4 flex flex-col">
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#5BA3D0] relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#5BA3D0]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#5BA3D0]" />
@@ -483,7 +533,7 @@ export default function ProductDetail() {
               </div>
               
               {/* Circularity Breakdown */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#4ade80] rounded relative overflow-hidden p-4 flex flex-col">
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#4ade80] relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#4ade80]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#4ade80]" />
@@ -527,8 +577,8 @@ export default function ProductDetail() {
                         <div className="h-full bg-[#4ade80]" style={{ width: '93%' }} />
                       </div>
                     </div>
-                  </div>
-                  
+        </div>
+
                   <div className="mt-3 pt-3 border-t border-[#4ade80]/20">
                     <div className="text-[8px] text-gray-500 font-mono">
                       <span className="text-[#4ade80]">100%</span> reclaimed
@@ -540,10 +590,8 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Materials Carousel */}
-        <div className="mb-8">
-          <MaterialsCarousel materials={productData.materials} />
-        </div>
+        {/* Tools & Materials Required */}
+        <ToolsAndMaterialsSection items={productData.toolsAndMaterials} />
 
         {/* How to Build Storyboard */}
         <div>

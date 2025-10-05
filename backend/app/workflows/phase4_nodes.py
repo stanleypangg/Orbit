@@ -171,8 +171,161 @@ def _build_troubleshooting(ingredients: List[Dict[str, Any]]) -> List[Dict[str, 
     return tips
 
 
+async def _generate_tool_icons(tools_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Generate SVG icons for tools in terminal green theme."""
+    from app.ai_service.production_gemini import production_call_gemini
+    
+    tools_with_icons = []
+    
+    for tool in tools_list:
+        tool_name = tool.get("name", "")
+        
+        # Create SVG prompt
+        icon_prompt = f"""Generate a minimalist SVG icon for: {tool_name}
+
+Requirements:
+- Simple, geometric design suitable for terminal/video game UI
+- Use ONLY these colors:
+  - Primary: #67B68B (terminal green)
+  - Secondary: #5BA3D0 (blue accent)
+  - Background: transparent
+- Size: 24x24 viewBox
+- Line weight: 2px
+- Style: Minimalist, flat, no gradients
+- Must be recognizable at small sizes
+
+Return ONLY the complete SVG code (including <svg> tags), no explanations."""
+
+        try:
+            response = await production_call_gemini(
+                prompt=icon_prompt,
+                task_type="generation",
+                response_schema=None  # Raw text response for SVG
+            )
+            
+            if response and isinstance(response, dict):
+                svg_code = response.get("response", "") or response.get("text", "")
+            elif isinstance(response, str):
+                svg_code = response
+            else:
+                svg_code = ""
+            
+            # Fallback to default icon if generation fails
+            if not svg_code or "<svg" not in svg_code:
+                svg_code = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    <path d="M12 8v8m-4-4h8"/>
+                </svg>'''
+            
+            tools_with_icons.append({
+                **tool,
+                "icon_svg": svg_code
+            })
+            
+        except Exception as e:
+            logger.warning(f"Icon generation failed for {tool_name}: {e}, using fallback")
+            # Fallback icon
+            tools_with_icons.append({
+                **tool,
+                "icon_svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
+                    <circle cx="12" cy="12" r="8"/>
+                    <path d="M12 8v4m0 4h.01"/>
+                </svg>'''
+            })
+    
+    return tools_with_icons
+
+
+async def _extract_detailed_tools(
+    selected_option: Dict[str, Any],
+    ingredients: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Extract detailed tool requirements with AI, excluding original ingredients."""
+    from app.ai_service.production_gemini import production_call_gemini
+    
+    basic_tools = selected_option.get("tools_required", [])
+    project_title = selected_option.get("title", "DIY Project")
+    construction_steps = selected_option.get("construction_steps", [])
+    
+    # Get ingredient names to exclude
+    ingredient_names = [ing.get("name", "").lower() for ing in ingredients]
+    
+    tools_prompt = f"""You are analyzing a DIY upcycling project to identify required tools and additional materials.
+
+PROJECT: {project_title}
+CONSTRUCTION STEPS: {', '.join(construction_steps[:5])}
+BASIC TOOLS MENTIONED: {', '.join(basic_tools) if basic_tools else 'None specified'}
+
+ORIGINAL INGREDIENTS (DO NOT INCLUDE THESE):
+{', '.join(ingredient_names)}
+
+Extract:
+1. TOOLS: Physical implements needed (scissors, glue gun, drill, etc.)
+2. ADDITIONAL MATERIALS: Consumables needed beyond original ingredients (glue, tape, screws, paint, etc.)
+
+For each item provide:
+- name: Tool or material name
+- category: "tool" or "material"
+- purpose: Why it's needed (1 short sentence)
+- is_optional: true if nice-to-have, false if required
+
+Rules:
+- Do NOT include the original recycled ingredients
+- Focus on tools and consumables needed for assembly
+- Be specific (e.g., "hot glue gun" not just "glue")
+- Include common household alternatives if available"""
+
+    TOOLS_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string", "enum": ["tool", "material"]},
+                        "purpose": {"type": "string"},
+                        "is_optional": {"type": "boolean"},
+                        "alternatives": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["name", "category", "purpose", "is_optional"]
+                }
+            }
+        },
+        "required": ["items"]
+    }
+    
+    try:
+        logger.info("TOOLS: Extracting detailed tool requirements with AI")
+        response = await production_call_gemini(
+            prompt=tools_prompt,
+            task_type="analysis",
+            response_schema=TOOLS_SCHEMA
+        )
+        
+        if response and not response.get("error"):
+            tools_data = response.get("items", [])
+            logger.info(f"TOOLS: ✓ Extracted {len(tools_data)} tools/materials")
+            return tools_data
+        else:
+            logger.warning("TOOLS: AI extraction failed, using basic list")
+            return [{"name": tool, "category": "tool", "purpose": "Required for assembly", "is_optional": False} 
+                    for tool in basic_tools]
+            
+    except Exception as e:
+        logger.error(f"TOOLS: Error in extraction: {e}")
+        return [{"name": tool, "category": "tool", "purpose": "Required for assembly", "is_optional": False} 
+                for tool in basic_tools]
+
+
 def _build_materials_guide(ingredients: List[Dict[str, Any]], selected_option: Dict[str, Any]) -> Dict[str, Any]:
-    """Document material usage, tool requirements, and preparation steps."""
+    """Document material usage, tool requirements, and preparation steps.
+    NOTE: This is synchronous for legacy compatibility. Use _extract_detailed_tools for enhanced data.
+    """
     materials = [
         {
             "name": item.get("name", "material"),
@@ -234,8 +387,157 @@ def _build_construction_manual(project_preview: Dict[str, Any], selected_option:
     }
 
 
+async def _calculate_detailed_esg_metrics(
+    ingredients: List[Dict[str, Any]], 
+    selected_option: Dict[str, Any],
+    project_context: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Use AI to calculate detailed, researched ESG metrics for the project."""
+    from app.ai_service.production_gemini import production_call_gemini
+    
+    materials_list = ", ".join([ing.get("name", ing.get("material", "")) for ing in ingredients])
+    project_title = selected_option.get("title", project_context.get("title", "DIY Project"))
+    project_desc = selected_option.get("description", "")
+    difficulty = selected_option.get("difficulty_level", "beginner")
+    
+    esg_prompt = f"""You are an environmental impact analyst specializing in DIY upcycling and circular economy projects.
+
+PROJECT DETAILS:
+- Title: {project_title}
+- Description: {project_desc}
+- Materials: {materials_list}
+- Difficulty: {difficulty}
+- Material Count: {len(ingredients)}
+
+Calculate DETAILED ESG (Environmental, Social, Governance) metrics for this DIY upcycling project. Compare against typical new product manufacturing.
+
+Provide scores (0-100) and actual data for:
+
+1. CARBON IMPACT:
+   - emissions_reduction_score (0-100): How much CO2 is avoided vs new manufacturing
+   - energy_efficiency_score (0-100): Energy saved in production
+   - transport_impact_score (0-100): Local materials, reduced shipping
+   - total_co2_avoided_kg: Actual kg of CO2 saved (research-based estimate)
+
+2. WATER CONSERVATION:
+   - usage_reduction_score (0-100): Water saved vs new manufacturing
+   - pollution_prevention_score (0-100): Chemical treatment avoided
+   - treatment_efficiency_score (0-100): No industrial water treatment needed
+   - total_water_saved_liters: Actual liters saved (research-based estimate)
+
+3. MATERIAL CIRCULARITY:
+   - reuse_score (0-100): Percentage of reclaimed materials
+   - longevity_score (0-100): Durability and lifespan
+   - end_of_life_score (0-100): Recyclability after use
+   - circularity_percentage: Overall circular economy score
+
+4. OVERALL ESG SCORE: Average of all sub-scores
+
+Base your calculations on:
+- Industry research for material footprints
+- Typical manufacturing CO2/water consumption
+- Material properties and longevity
+- Circular economy principles
+
+Be realistic but give credit for upcycling efforts."""
+
+    ESG_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "carbon_impact": {
+                "type": "object",
+                "properties": {
+                    "emissions_reduction_score": {"type": "number"},
+                    "energy_efficiency_score": {"type": "number"},
+                    "transport_impact_score": {"type": "number"},
+                    "total_co2_avoided_kg": {"type": "number"},
+                    "rationale": {"type": "string"}
+                },
+                "required": ["emissions_reduction_score", "energy_efficiency_score", "transport_impact_score", "total_co2_avoided_kg"]
+            },
+            "water_conservation": {
+                "type": "object",
+                "properties": {
+                    "usage_reduction_score": {"type": "number"},
+                    "pollution_prevention_score": {"type": "number"},
+                    "treatment_efficiency_score": {"type": "number"},
+                    "total_water_saved_liters": {"type": "number"},
+                    "rationale": {"type": "string"}
+                },
+                "required": ["usage_reduction_score", "pollution_prevention_score", "treatment_efficiency_score", "total_water_saved_liters"]
+            },
+            "material_circularity": {
+                "type": "object",
+                "properties": {
+                    "reuse_score": {"type": "number"},
+                    "longevity_score": {"type": "number"},
+                    "end_of_life_score": {"type": "number"},
+                    "circularity_percentage": {"type": "number"},
+                    "rationale": {"type": "string"}
+                },
+                "required": ["reuse_score", "longevity_score", "end_of_life_score", "circularity_percentage"]
+            },
+            "overall_esg_score": {"type": "number"},
+            "methodology_notes": {"type": "string"}
+        },
+        "required": ["carbon_impact", "water_conservation", "material_circularity", "overall_esg_score"]
+    }
+    
+    try:
+        logger.info("ESG: Calculating detailed metrics with AI for project: %s", project_title)
+        response = await production_call_gemini(
+            prompt=esg_prompt,
+            task_type="analysis",
+            response_schema=ESG_SCHEMA
+        )
+        
+        if response and not response.get("error"):
+            logger.info("ESG: ✓ Detailed metrics calculated successfully")
+            return response
+        else:
+            logger.warning("ESG: AI calculation failed, using fallback formulas")
+            return _fallback_esg_calculation(ingredients)
+            
+    except Exception as e:
+        logger.error(f"ESG: Error in AI calculation: {e}, using fallback")
+        return _fallback_esg_calculation(ingredients)
+
+
+def _fallback_esg_calculation(ingredients: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Fallback ESG calculation using simple formulas if AI fails."""
+    material_count = max(1, len(ingredients))
+    
+    return {
+        "carbon_impact": {
+            "emissions_reduction_score": 95,
+            "energy_efficiency_score": 92,
+            "transport_impact_score": 98,
+            "total_co2_avoided_kg": round(material_count * 1.2, 2),
+            "rationale": "Estimated based on material count"
+        },
+        "water_conservation": {
+            "usage_reduction_score": 97,
+            "pollution_prevention_score": 100,
+            "treatment_efficiency_score": 95,
+            "total_water_saved_liters": round(material_count * 5, 2),
+            "rationale": "Estimated based on typical manufacturing water usage"
+        },
+        "material_circularity": {
+            "reuse_score": 100,
+            "longevity_score": 90,
+            "end_of_life_score": 88,
+            "circularity_percentage": 93,
+            "rationale": "Based on upcycled materials and design"
+        },
+        "overall_esg_score": 95,
+        "methodology_notes": "Fallback calculation - AI analysis unavailable"
+    }
+
+
 def _build_sustainability_impact(ingredients: List[Dict[str, Any]], selected_option: Dict[str, Any]) -> Dict[str, Any]:
-    """Summarize environmental, social, and circular economy metrics."""
+    """Summarize environmental, social, and circular economy metrics.
+    NOTE: This is a legacy function that returns basic metrics. Use _calculate_detailed_esg_metrics for detailed analysis.
+    """
     material_count = max(1, len(ingredients))
     esg_score = selected_option.get("esg_score", {})
 
@@ -365,8 +667,29 @@ async def final_packaging_node(state: WorkflowState) -> Dict[str, Any]:
     # Store ESSENTIAL package immediately (fast!)
     _safe_set_redis(f"package_essential:{state.thread_id}", essential_package)
     
+    # Calculate detailed ESG metrics with AI
+    logger.info("H1: Calculating detailed ESG metrics with AI...")
+    project_context = {
+        "title": selected_option.get("title", "DIY Project"),
+        "goals": state.goals or state.user_input
+    }
+    detailed_esg = await _calculate_detailed_esg_metrics(ingredients, selected_option, project_context)
+    
+    # Extract detailed tools and materials with AI
+    logger.info("H1: Extracting detailed tools and materials...")
+    detailed_tools = await _extract_detailed_tools(selected_option, ingredients)
+    
+    # Generate icons for tools
+    logger.info("H1: Generating tool icons...")
+    tools_with_icons = await _generate_tool_icons(detailed_tools)
+    
     # Also store as full package for compatibility (will be enhanced later)
     full_package = _build_final_package(state)
+    
+    # Add detailed ESG metrics and tools to the package
+    full_package["detailed_esg_metrics"] = detailed_esg
+    full_package["detailed_tools_and_materials"] = tools_with_icons
+    
     state.final_package = full_package
     state.final_output = full_package
     state.current_phase = "complete"
@@ -374,12 +697,17 @@ async def final_packaging_node(state: WorkflowState) -> Dict[str, Any]:
     
     _safe_set_redis(f"final_package:{state.thread_id}", full_package)
     
+    # Also store ESG metrics and tools separately for easy access
+    _safe_set_redis(f"esg_metrics:{state.thread_id}", detailed_esg)
+    _safe_set_redis(f"tools_materials:{state.thread_id}", {"items": tools_with_icons})
+    
     duration = time.time() - start_time
-    logger.info("H1: ESSENTIAL package ready in %.2fs (detailed content available)", duration)
+    logger.info("H1: ESSENTIAL package ready in %.2fs (with detailed ESG metrics)", duration)
 
     return {
         "essential_package": essential_package,  # NEW: Quick display
         "final_package": full_package,  # Keep full for compatibility
+        "detailed_esg_metrics": detailed_esg,  # NEW: Detailed ESG data
         "current_phase": state.current_phase,
         "current_node": state.current_node,
         "optimization_mode": "progressive",  # Flag for tracking
