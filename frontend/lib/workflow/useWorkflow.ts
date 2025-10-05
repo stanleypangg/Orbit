@@ -3,23 +3,46 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Ingredient } from '@/lib/chat/types';
 
-interface WorkflowIdea {
-  id: string;
+interface WorkflowOption {
+  option_id: string;
   title: string;
-  one_liner: string;
+  description: string;
+  category?: string;
+  materials_used: string[];
+  construction_steps?: string[];
+  tools_required?: string[];
+  estimated_time?: string;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+  innovation_score?: number;
+  practicality_score?: number;
+}
+
+interface WorkflowConcept {
+  concept_id: string;
+  title: string;
+  image_url: string;
+  description?: string;
+  style?: string;
 }
 
 interface WorkflowState {
-  phase: 'idle' | 'starting' | 'ingredient_discovery' | 'goal_formation' | 'concept_generation' | 'complete' | 'error';
+  phase: 'idle' | 'starting' | 'ingredient_discovery' | 'goal_formation' | 'choice_selection' | 'concept_generation' | 'concept_selection' | 'packaging' | 'complete' | 'error';
   threadId: string | null;
   currentNode: string | null;
   ingredients: Ingredient[];
   question: string | null;
   needsInput: boolean;
-  ideas: WorkflowIdea[];
-  concepts: any[];
+  needsSelection: boolean;
+  selectionType: 'option' | 'concept' | null;
+  projectOptions: WorkflowOption[];
+  concepts: WorkflowConcept[];
+  selectedOption: WorkflowOption | null;
+  selectedConcept: WorkflowConcept | null;
+  finalPackage: any | null;
   error: string | null;
   progress: number;
+  isLoading: boolean;
+  loadingMessage: string | null;
 }
 
 interface UseWorkflowOptions {
@@ -31,6 +54,8 @@ interface UseWorkflowReturn {
   state: WorkflowState;
   startWorkflow: (userInput: string) => Promise<void>;
   resumeWorkflow: (userInput: string) => Promise<void>;
+  selectOption: (optionId: string) => Promise<void>;
+  selectConcept: (conceptId: string) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -49,10 +74,17 @@ export function useWorkflow({
     ingredients: [],
     question: null,
     needsInput: false,
-    ideas: [],
+    needsSelection: false,
+    selectionType: null,
+    projectOptions: [],
     concepts: [],
+    selectedOption: null,
+    selectedConcept: null,
+    finalPackage: null,
     error: null,
     progress: 0,
+    isLoading: false,
+    loadingMessage: null,
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -76,10 +108,24 @@ export function useWorkflow({
         
         switch (data.type) {
           case 'state_update':
+            const currentNode = data.data.current_node;
+            const loadingMessages: Record<string, string> = {
+              'P1a_extract': '🔍 Analyzing your materials with AI...',
+              'P1b_null_check': '🤔 Checking for missing details...',
+              'P1c_categorize': '📦 Organizing ingredients...',
+              'G1_goal_formation': '🎯 Understanding your goals...',
+              'O1_choice_generation': '💡 Generating creative options...',
+              'E1_evaluation': '✨ Evaluating feasibility...',
+              'PR1_prompt_builder': '🎨 Crafting concept prompts...',
+              'IMG_generation': '🖼️ Generating concept images...',
+            };
+            
             setState(prev => ({
               ...prev,
-              currentNode: data.data.current_node,
+              currentNode: currentNode,
               phase: mapBackendPhaseToUI(data.data.current_phase),
+              isLoading: true,
+              loadingMessage: loadingMessages[currentNode] || '⚙️ Processing...',
             }));
             if (onPhaseChange && data.data.current_phase) {
               onPhaseChange(data.data.current_phase);
@@ -99,23 +145,64 @@ export function useWorkflow({
                 confidence: ing.confidence || 0.8,
               })),
               phase: 'ingredient_discovery',
+              isLoading: false,
+              loadingMessage: null,
             }));
             break;
 
           case 'user_question':
             const questions = Array.isArray(data.data) ? data.data : [data.data];
+            const firstQuestion = typeof questions[0] === 'string' ? questions[0] : String(questions[0]);
+            console.log('Received clarification question:', firstQuestion);
             setState(prev => ({
               ...prev,
-              question: questions[0],
+              question: firstQuestion,
               needsInput: true,
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            break;
+
+          case 'choices_generated':
+            const options = data.data.viable_options || [];
+            setState(prev => ({
+              ...prev,
+              projectOptions: options,
+              phase: 'choice_selection',
+              needsSelection: true,
+              selectionType: 'option',
+              isLoading: false,
+              loadingMessage: null,
             }));
             break;
 
           case 'concepts_generated':
+            const concepts = data.data.concepts || data.data.concept_variants || [];
             setState(prev => ({
               ...prev,
-              concepts: data.data.concepts || [],
-              phase: 'concept_generation',
+              concepts: concepts.map((c: any, idx: number) => ({
+                concept_id: c.concept_id || `concept_${idx}`,
+                title: c.title || c.style || `Concept ${idx + 1}`,
+                image_url: c.image_url || c.url || '',
+                description: c.description,
+                style: c.style,
+              })),
+              phase: 'concept_selection',
+              needsSelection: true,
+              selectionType: 'concept',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            break;
+
+          case 'package_ready':
+          case 'project_package':
+            setState(prev => ({
+              ...prev,
+              finalPackage: data.data,
+              phase: 'complete',
+              isLoading: false,
+              loadingMessage: null,
             }));
             break;
 
@@ -123,6 +210,8 @@ export function useWorkflow({
             setState(prev => ({
               ...prev,
               phase: 'complete',
+              isLoading: false,
+              loadingMessage: null,
             }));
             disconnect();
             break;
@@ -132,6 +221,8 @@ export function useWorkflow({
               ...prev,
               error: data.data?.error || data.message || 'An error occurred',
               phase: 'error',
+              isLoading: false,
+              loadingMessage: null,
             }));
             break;
 
@@ -140,6 +231,8 @@ export function useWorkflow({
               ...prev,
               error: 'Workflow timeout',
               phase: 'error',
+              isLoading: false,
+              loadingMessage: null,
             }));
             disconnect();
             break;
@@ -165,6 +258,8 @@ export function useWorkflow({
       ...prev,
       phase: 'starting',
       error: null,
+      isLoading: true,
+      loadingMessage: '🚀 Starting workflow...',
     }));
 
     try {
@@ -185,6 +280,8 @@ export function useWorkflow({
         ...prev,
         threadId,
         phase: 'ingredient_discovery',
+        isLoading: true,
+        loadingMessage: '🔍 Analyzing your materials...',
       }));
 
       // Connect to SSE stream
@@ -234,6 +331,8 @@ export function useWorkflow({
       ...prev,
       needsInput: false,
       question: null,
+      isLoading: true,
+      loadingMessage: '💭 Processing your answer...',
     }));
 
     try {
@@ -264,10 +363,87 @@ export function useWorkflow({
     };
   }, [disconnect]);
 
+  const selectOption = useCallback(async (optionId: string) => {
+    if (!state.threadId) {
+      console.error('No thread ID available');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      needsSelection: false,
+      isLoading: true,
+      loadingMessage: '✨ Evaluating your choice...',
+      selectedOption: prev.projectOptions.find(o => o.option_id === optionId) || null,
+    }));
+
+    try {
+      // Call backend to proceed with selected option
+      const response = await fetch(`${apiUrl}/workflow/select-option/${state.threadId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ option_id: optionId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // The SSE stream will handle updates
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.message || 'Failed to select option',
+        phase: 'error',
+        isLoading: false,
+      }));
+    }
+  }, [apiUrl, state.threadId]);
+
+  const selectConcept = useCallback(async (conceptId: string) => {
+    if (!state.threadId) {
+      console.error('No thread ID available');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      needsSelection: false,
+      isLoading: true,
+      loadingMessage: '📦 Packaging your project...',
+      selectedConcept: prev.concepts.find(c => c.concept_id === conceptId) || null,
+    }));
+
+    try {
+      // Use existing select-concept endpoint
+      const conceptIndex = state.concepts.findIndex(c => c.concept_id === conceptId);
+      const response = await fetch(`${apiUrl}/workflow/select-concept/${state.threadId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concept_id: conceptIndex }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // The SSE stream will handle updates
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.message || 'Failed to select concept',
+        phase: 'error',
+        isLoading: false,
+      }));
+    }
+  }, [apiUrl, state.threadId, state.concepts]);
+
   return {
     state,
     startWorkflow,
     resumeWorkflow,
+    selectOption,
+    selectConcept,
     disconnect,
   };
 }

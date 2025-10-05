@@ -190,6 +190,16 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini Pro for complex reasoning about project possibilities.
     """
     logger.info(f"G1: Starting goal formation for thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "goal_formation",
+        "current_node": "G1_goal_formation",
+        "result": {}
+    }), ex=3600)
 
     # Validate that we have ingredient data
     if not state.ingredients_data or not state.ingredients_data.ingredients:
@@ -328,6 +338,16 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini Pro for creative problem solving and feasibility analysis.
     """
     logger.info(f"O1: Starting choice generation for thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "goal_formation",
+        "current_node": "O1_choice_generation",
+        "result": {}
+    }), ex=3600)
 
     # Validate inputs
     if not state.goals or not state.ingredients_data:
@@ -457,6 +477,16 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
     Uses Gemini Pro for comprehensive analysis and safety assessment.
     """
     logger.info(f"E1: Starting option evaluation for thread {state.thread_id}")
+    
+    # Update Redis with current state
+    from app.core.redis import redis_service
+    state_key = f"workflow_state:{state.thread_id}"
+    redis_service.set(state_key, json.dumps({
+        "status": "running",
+        "current_phase": "goal_formation",
+        "current_node": "E1_evaluation",
+        "result": {}
+    }), ex=3600)
 
     # Validate inputs
     if not state.viable_options:

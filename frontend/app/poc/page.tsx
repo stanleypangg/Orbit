@@ -8,6 +8,28 @@ import PresetCard from "@/components/PresetCard";
 import { useWorkflow } from "@/lib/workflow/useWorkflow";
 import { Idea, Ingredient } from "@/lib/chat/types";
 
+interface WorkflowOption {
+  option_id: string;
+  title: string;
+  description: string;
+  category?: string;
+  materials_used: string[];
+  construction_steps?: string[];
+  tools_required?: string[];
+  estimated_time?: string;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+  innovation_score?: number;
+  practicality_score?: number;
+}
+
+interface WorkflowConcept {
+  concept_id: string;
+  title: string;
+  image_url: string;
+  description?: string;
+  style?: string;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -15,6 +37,8 @@ interface Message {
   ingredients?: Ingredient[];
   needsClarification?: boolean;
   clarifyingQuestions?: string[];
+  projectOptions?: WorkflowOption[];
+  concepts?: WorkflowConcept[];
 }
 
 export default function Home() {
@@ -39,12 +63,8 @@ export default function Home() {
     setPageLoaded(true);
   }, []);
 
-  const {
-    state: workflowState,
-    startWorkflow,
-    resumeWorkflow,
-  } = useWorkflow({
-    apiUrl: "http://localhost:8000",
+  const { state: workflowState, startWorkflow, resumeWorkflow, selectOption, selectConcept } = useWorkflow({
+    apiUrl: 'http://localhost:8000',
   });
 
   const presets = [
@@ -184,13 +204,11 @@ export default function Home() {
       workflowState.ingredients.length > 0
     ) {
       // Update messages with ingredient data
-      const assistantId = `assistant-${Date.now()}`;
-      const hasNewIngredients = !messages.some(
-        (m) => m.ingredients && m.ingredients.length > 0
-      );
-
+      const hasNewIngredients = !messages.some(m => m.ingredients && m.ingredients.length > 0);
+      
       if (hasNewIngredients) {
-        setMessages((prev) => [
+        const assistantId = `assistant-${Date.now()}`;
+        setMessages(prev => [
           ...prev,
           {
             role: "assistant",
@@ -207,42 +225,58 @@ export default function Home() {
         setExtractedIngredients(workflowState.ingredients);
       }
     }
+  }, [workflowState.phase, workflowState.ingredients.length]); // Only re-run when phase or ingredient count changes
 
+  useEffect(() => {
     if (workflowState.needsInput && workflowState.question) {
+      console.log('Workflow needs input, question:', workflowState.question);
+      console.log('Current messages:', messages);
+      
       // Add clarification question to messages if not already present
-      const hasQuestion = messages.some((m) =>
-        m.clarifyingQuestions?.includes(workflowState.question!)
+      const hasQuestion = messages.some(m => 
+        m.clarifyingQuestions?.includes(workflowState.question!) || 
+        m.content === workflowState.question ||
+        m.content.includes(workflowState.question!)
       );
-
+      
+      console.log('Has question already?', hasQuestion);
+      
       if (!hasQuestion) {
         const questionId = `question-${Date.now()}`;
-        setMessages((prev) => [
+        const newMessage = {
+          role: "assistant" as const,
+          content: workflowState.question!, // Use the question as the main content
+          id: questionId,
+          needsClarification: true,
+          clarifyingQuestions: [workflowState.question!],
+        };
+        console.log('Adding question message:', newMessage);
+        setMessages(prev => [...prev, newMessage]);
+        setAnimatedMessageIds(prev => new Set([...prev, questionId]));
+      }
+    }
+  }, [workflowState.question, workflowState.needsInput]); // Only re-run when question changes
+
+  useEffect(() => {
+    if (workflowState.error) {
+      // Check if this error is already displayed
+      const hasError = messages.some(m => m.content === `Error: ${workflowState.error}`);
+      
+      if (!hasError) {
+        const errorId = `error-${Date.now()}`;
+        setMessages(prev => [
           ...prev,
           {
             role: "assistant",
-            content: workflowState.question!,
-            id: questionId,
-            needsClarification: true,
+            content: `Error: ${workflowState.error}`,
+            id: errorId,
           },
         ]);
-        setAnimatedMessageIds((prev) => new Set([...prev, questionId]));
+        setAnimatedMessageIds(prev => new Set([...prev, errorId]));
+        setIsGenerating(false);
       }
     }
-
-    if (workflowState.error) {
-      const errorId = `error-${Date.now()}`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `Error: ${workflowState.error}`,
-          id: errorId,
-        },
-      ]);
-      setAnimatedMessageIds((prev) => new Set([...prev, errorId]));
-      setIsGenerating(false);
-    }
-  }, [workflowState, messages, setExtractedIngredients, setIsGenerating]);
+  }, [workflowState.error]); // Only re-run when error changes
 
   const handleIdeaSelect = (idea: Idea) => {
     setSelectedIdea(idea);
@@ -257,6 +291,56 @@ export default function Home() {
     ]);
     setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
   };
+
+  const handleOptionSelect = async (optionId: string) => {
+    await selectOption(optionId);
+  };
+
+  const handleConceptSelect = async (conceptId: string) => {
+    await selectConcept(conceptId);
+  };
+
+  // Handle workflow option selection - Add options to messages
+  useEffect(() => {
+    if (workflowState.needsSelection && workflowState.selectionType === 'option' && workflowState.projectOptions.length > 0) {
+      const hasOptions = messages.some(m => m.projectOptions && m.projectOptions.length > 0);
+      
+      if (!hasOptions) {
+        const optionsId = `options-${Date.now()}`;
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I've generated creative project ideas based on your materials! Choose one to continue:",
+            id: optionsId,
+            projectOptions: workflowState.projectOptions,
+          },
+        ]);
+        setAnimatedMessageIds(prev => new Set([...prev, optionsId]));
+      }
+    }
+  }, [workflowState.needsSelection, workflowState.selectionType, workflowState.projectOptions.length]);
+
+  // Handle workflow concept selection - Add concepts to messages
+  useEffect(() => {
+    if (workflowState.needsSelection && workflowState.selectionType === 'concept' && workflowState.concepts.length > 0) {
+      const hasConcepts = messages.some(m => m.concepts && m.concepts.length > 0);
+      
+      if (!hasConcepts) {
+        const conceptsId = `concepts-${Date.now()}`;
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Here are 3 concept visualizations for your project! Choose your favorite:",
+            id: conceptsId,
+            concepts: workflowState.concepts,
+          },
+        ]);
+        setAnimatedMessageIds(prev => new Set([...prev, conceptsId]));
+      }
+    }
+  }, [workflowState.needsSelection, workflowState.selectionType, workflowState.concepts.length]);
 
   const handleExampleClick = (text: string) => {
     setPrompt(text);
@@ -383,33 +467,119 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Clarifying Questions */}
-                        {message.needsClarification &&
-                          message.clarifyingQuestions &&
-                          message.clarifyingQuestions.length > 0 && (
-                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
-                              <h3 className="text-yellow-400 text-lg font-semibold mb-2">
-                                ❓ Need More Information
-                              </h3>
+                        {/* Clarifying Questions - Always show if needsClarification is true */}
+                        {message.needsClarification && (
+                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4 mt-2">
+                            <h3 className="text-yellow-400 text-lg font-semibold mb-2">
+                              ❓ Please Answer
+                            </h3>
+                            {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 ? (
                               <ul className="space-y-2">
-                                {message.clarifyingQuestions.map(
-                                  (question, idx) => (
-                                    <li
-                                      key={idx}
-                                      className="text-yellow-200 text-sm"
-                                    >
-                                      • {question}
-                                    </li>
-                                  )
-                                )}
+                                {message.clarifyingQuestions.map((question, idx) => (
+                                  <li key={idx} className="text-yellow-200 text-sm">
+                                    • {question}
+                                  </li>
+                                ))}
                               </ul>
+                            ) : (
+                              <p className="text-yellow-200 text-sm">Please provide the requested information in the input below.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Render Project Options if present */}
+                    {message.projectOptions && message.projectOptions.length > 0 && (
+                      <div className="mt-4">
+                        <div className="grid grid-cols-1 gap-3">
+                          {message.projectOptions.map((option) => (
+                            <div
+                              key={option.option_id}
+                              onClick={() => handleOptionSelect(option.option_id)}
+                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
+                              style={{ animation: "fadeIn 0.5s ease-out forwards" }}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <h4 className="text-white font-semibold text-lg">{option.title}</h4>
+                                {option.difficulty_level && (
+                                  <span className={`text-xs px-2 py-1 rounded ${
+                                    option.difficulty_level === 'beginner' ? 'bg-green-900 text-green-200' :
+                                    option.difficulty_level === 'intermediate' ? 'bg-yellow-900 text-yellow-200' :
+                                    'bg-red-900 text-red-200'
+                                  }`}>
+                                    {option.difficulty_level}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-400 text-sm mb-3">{option.description}</p>
+                              <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-2">
+                                {option.estimated_time && <span>⏱️ {option.estimated_time}</span>}
+                                {option.materials_used && <span>🔧 {option.materials_used.length} materials</span>}
+                                {option.tools_required && option.tools_required.length > 0 && (
+                                  <span>🛠️ {option.tools_required.slice(0, 2).join(', ')}</span>
+                                )}
+                              </div>
+                              {option.construction_steps && option.construction_steps.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-2">
+                                  <strong>{option.construction_steps.length} steps</strong> • Innovation: {Math.round((option.innovation_score || 0) * 100)}%
+                                </div>
+                              )}
                             </div>
-                          )}
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Render Concept Images if present */}
+                    {message.concepts && message.concepts.length > 0 && (
+                      <div className="mt-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          {message.concepts.map((concept) => (
+                            <div
+                              key={concept.concept_id}
+                              onClick={() => handleConceptSelect(concept.concept_id)}
+                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.05]"
+                              style={{ animation: "fadeIn 0.5s ease-out forwards" }}
+                            >
+                              {concept.image_url && (
+                                <div className="w-full h-48 bg-[#232937] flex items-center justify-center">
+                                  <img src={concept.image_url} alt={concept.title} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                              <div className="p-3">
+                                <h4 className="text-white font-medium text-sm">{concept.title}</h4>
+                                {concept.description && (
+                                  <p className="text-gray-400 text-xs mt-1">{concept.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
+              
+              {/* Loading Indicator */}
+              {workflowState.isLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[70%] px-4 py-3 rounded-lg bg-[#2A3142] text-white">
+                    <div className="flex items-center gap-3">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-300">
+                        {workflowState.loadingMessage || 'Processing...'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -440,18 +610,17 @@ export default function Home() {
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!chatInput.trim()}
-                className="absolute right-3 bottom-3 p-2 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
-                aria-label="Send message"
+                disabled={!chatInput.trim() || workflowState.isLoading}
+                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase rounded"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-5 h-5 text-black"
-                >
-                  <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                </svg>
+                {workflowState.isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    Processing
+                  </span>
+                ) : (
+                  'Send'
+                )}
               </button>
             </div>
           </div>
