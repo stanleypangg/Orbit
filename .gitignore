@@ -4,3 +4,4 @@
 node_modules
 .md
 !README.md
+.pytest_cache

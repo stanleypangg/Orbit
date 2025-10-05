@@ -8,17 +8,13 @@ from redis.exceptions import RedisError
 
 from app.core.config import settings
 
-# Default to the production instance when no explicit URL is provided.
-_DEFAULT_REDIS_URL = (
-    "redis://default:55dMHoyAAp6eK7uqqFkrb2WDikXOVKwW@"
-    "redis-12424.c83.us-east-1-2.ec2.redns.redis-cloud.com:12424"
-)
+# Default to local Redis instance
+_DEFAULT_REDIS_URL = "redis://127.0.0.1:6379/0"
 
 
 def _resolve_redis_url() -> str:
     """Determine the Redis connection string from environment, settings, or default."""
     env_url = os.getenv("REDIS_URL")
-    # Some environments may not expose REDIS_URL on the Settings model yet.
     settings_url = getattr(settings, "REDIS_URL", None)
     return env_url or settings_url or _DEFAULT_REDIS_URL
 
