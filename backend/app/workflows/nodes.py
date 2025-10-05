@@ -226,6 +226,19 @@ async def ingredient_extraction_node(state: WorkflowState) -> Dict[str, Any]:
     """
     logger.info(f"P1a: Starting ingredient extraction for thread {state.thread_id}")
     
+    # FIX: Skip extraction if we're resuming after clarification (ingredients already exist)
+    # This happens because ainvoke() always starts from START, even when resuming
+    if state.ingredients_data and state.ingredients_data.ingredients:
+        logger.info(f"P1a: Skipping extraction - {len(state.ingredients_data.ingredients)} ingredients already exist (resuming from clarification)")
+        return {"ingredients_data": state.ingredients_data, "current_node": "P1b"}
+    
+    # Also check Redis in case state doesn't have them
+    existing_ingredients = load_ingredients_from_redis(state.thread_id)
+    if existing_ingredients and existing_ingredients.ingredients and len(existing_ingredients.ingredients) > 0:
+        logger.info(f"P1a: Skipping extraction - {len(existing_ingredients.ingredients)} ingredients found in Redis (resuming from clarification)")
+        state.ingredients_data = existing_ingredients
+        return {"ingredients_data": existing_ingredients, "current_node": "P1b"}
+    
     # Update Redis with current state
     from app.core.redis import redis_service
     import json

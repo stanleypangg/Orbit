@@ -465,7 +465,14 @@ async def analytics_node(state: WorkflowState) -> Dict[str, Any]:
         "sustainability_metrics": {
             "waste_diverted": environmental_metrics.get("waste_diverted", "0 kg"),
             "carbon_footprint": environmental_metrics.get("carbon_footprint", "0 kg CO2e avoided"),
-            "circularity_score": circular_info.get("reuse_score", esg_score.get("environmental", 7)),
+            # FIX: Ensure we always get a numeric value, not nested dicts
+            "circularity_score": (
+                circular_info.get("reuse_score", 7.0) 
+                if isinstance(circular_info.get("reuse_score"), (int, float)) 
+                else esg_score.get("environmental", 7.0) 
+                if isinstance(esg_score.get("environmental"), (int, float))
+                else 7.0
+            ),
             "energy_saved": environmental_metrics.get("energy_saved", "0 kWh"),
         },
         "user_engagement": {
