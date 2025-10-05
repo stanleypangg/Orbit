@@ -171,68 +171,124 @@ def _build_troubleshooting(ingredients: List[Dict[str, Any]]) -> List[Dict[str, 
     return tips
 
 
-async def _generate_tool_icons(tools_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Generate SVG icons for tools in terminal green theme."""
-    from app.ai_service.production_gemini import production_call_gemini
+def _map_tool_to_icon(tool_name: str) -> str:
+    """Map tool/material name to Lucide React icon name."""
+    tool_lower = tool_name.lower()
     
+    # Tool mappings
+    icon_map = {
+        # Cutting tools
+        "scissors": "Scissors",
+        "knife": "Scissors",
+        "cutter": "Slice",
+        "wire cutters": "Scissors",
+        "box cutter": "Slice",
+        "saw": "Hammer",
+        
+        # Heat tools
+        "heat gun": "Flame",
+        "soldering iron": "Flame",
+        "glue gun": "Flame",
+        "hot glue gun": "Flame",
+        
+        # Hand tools
+        "hammer": "Hammer",
+        "screwdriver": "Wrench",
+        "wrench": "Wrench",
+        "pliers": "Wrench",
+        "drill": "Settings",
+        "ruler": "Ruler",
+        "measuring tape": "Ruler",
+        "tape measure": "Ruler",
+        
+        # Fasteners & adhesives
+        "glue": "Droplet",
+        "tape": "StickyNote",
+        "adhesive": "Droplet",
+        "screws": "Settings",
+        "nails": "Settings",
+        "fasteners": "Link",
+        
+        # Paint & finish
+        "paint": "Paintbrush",
+        "brush": "Paintbrush",
+        "spray paint": "SprayCan",
+        "varnish": "Paintbrush",
+        "sandpaper": "Square",
+        
+        # Wire & jewelry
+        "wire": "Cable",
+        "jewelry wire": "Cable",
+        "chain": "Link",
+        "hooks": "Anchor",
+        "clasps": "Link",
+        "beads": "Circle",
+        
+        # Fabric & sewing
+        "needle": "Pin",
+        "thread": "Cable",
+        "fabric": "Sheet",
+        "zipper": "Link",
+        "buttons": "Circle",
+        
+        # General materials
+        "wood": "Box",
+        "plastic": "Box",
+        "metal": "Box",
+        "cardboard": "FileText",
+        "paper": "FileText",
+        "foam": "Square",
+        
+        # Fastening materials
+        "velcro": "Link",
+        "rope": "Cable",
+        "string": "Cable",
+        "rubber bands": "Circle",
+    }
+    
+    # Check for exact matches
+    if tool_lower in icon_map:
+        return icon_map[tool_lower]
+    
+    # Check for partial matches (contains keyword)
+    for keyword, icon in icon_map.items():
+        if keyword in tool_lower:
+            return icon
+    
+    # Default icons by category
+    if any(word in tool_lower for word in ["gun", "iron", "heat"]):
+        return "Flame"
+    elif any(word in tool_lower for word in ["cut", "saw", "trim"]):
+        return "Scissors"
+    elif any(word in tool_lower for word in ["drill", "screw", "bolt"]):
+        return "Settings"
+    elif any(word in tool_lower for word in ["paint", "color", "dye"]):
+        return "Paintbrush"
+    elif any(word in tool_lower for word in ["wire", "cable", "cord"]):
+        return "Cable"
+    elif any(word in tool_lower for word in ["glue", "adhesive", "cement"]):
+        return "Droplet"
+    elif any(word in tool_lower for word in ["tape", "strap", "band"]):
+        return "StickyNote"
+    
+    # Ultimate fallback
+    return "Wrench"
+
+
+def _assign_tool_icons(tools_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Assign Lucide icon names to tools and materials."""
     tools_with_icons = []
     
     for tool in tools_list:
         tool_name = tool.get("name", "")
+        icon_name = _map_tool_to_icon(tool_name)
         
-        # Create SVG prompt
-        icon_prompt = f"""Generate a minimalist SVG icon for: {tool_name}
-
-Requirements:
-- Simple, geometric design suitable for terminal/video game UI
-- Use ONLY these colors:
-  - Primary: #67B68B (terminal green)
-  - Secondary: #5BA3D0 (blue accent)
-  - Background: transparent
-- Size: 24x24 viewBox
-- Line weight: 2px
-- Style: Minimalist, flat, no gradients
-- Must be recognizable at small sizes
-
-Return ONLY the complete SVG code (including <svg> tags), no explanations."""
-
-        try:
-            response = await production_call_gemini(
-                prompt=icon_prompt,
-                task_type="generation",
-                response_schema=None  # Raw text response for SVG
-            )
-            
-            if response and isinstance(response, dict):
-                svg_code = response.get("response", "") or response.get("text", "")
-            elif isinstance(response, str):
-                svg_code = response
-            else:
-                svg_code = ""
-            
-            # Fallback to default icon if generation fails
-            if not svg_code or "<svg" not in svg_code:
-                svg_code = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
-                    <rect x="4" y="4" width="16" height="16" rx="2"/>
-                    <path d="M12 8v8m-4-4h8"/>
-                </svg>'''
-            
-            tools_with_icons.append({
-                **tool,
-                "icon_svg": svg_code
-            })
-            
-        except Exception as e:
-            logger.warning(f"Icon generation failed for {tool_name}: {e}, using fallback")
-            # Fallback icon
-            tools_with_icons.append({
-                **tool,
-                "icon_svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
-                    <circle cx="12" cy="12" r="8"/>
-                    <path d="M12 8v4m0 4h.01"/>
-                </svg>'''
-            })
+        tools_with_icons.append({
+            **tool,
+            "icon_name": icon_name  # Lucide icon component name
+        })
     
+    logger.info(f"ICONS: Mapped {len(tools_with_icons)} tools to Lucide icons")
     return tools_with_icons
 
 
@@ -679,9 +735,9 @@ async def final_packaging_node(state: WorkflowState) -> Dict[str, Any]:
     logger.info("H1: Extracting detailed tools and materials...")
     detailed_tools = await _extract_detailed_tools(selected_option, ingredients)
     
-    # Generate icons for tools
-    logger.info("H1: Generating tool icons...")
-    tools_with_icons = await _generate_tool_icons(detailed_tools)
+    # Assign Lucide icon names to tools
+    logger.info("H1: Assigning Lucide icons to tools...")
+    tools_with_icons = _assign_tool_icons(detailed_tools)
     
     # Also store as full package for compatibility (will be enhanced later)
     full_package = _build_final_package(state)

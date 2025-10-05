@@ -27,47 +27,35 @@ const productData = {
       category: "tool" as const,
       purpose: "Shape plastic pieces",
       is_optional: false,
-      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
-        <path d="M14 4v16M10 4v16M6 8l12 8M6 16l12-8"/>
-      </svg>`
+      icon_name: "Flame"
     },
     { 
       name: "Wire Cutters", 
       category: "tool" as const,
       purpose: "Cut jewelry wire",
       is_optional: false,
-      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5BA3D0" stroke-width="2">
-        <path d="M6 6l12 12M6 18L18 6M12 12L6 6M12 12l6 6"/>
-      </svg>`
+      icon_name: "Scissors"
     },
     { 
       name: "Pliers", 
       category: "tool" as const,
       purpose: "Bend and shape wire",
       is_optional: false,
-      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
-        <path d="M15 7l-6.5 6.5a2.12 2.12 0 1 0 3 3L18 10"/>
-        <path d="M9 10h.01M15 14h.01"/>
-      </svg>`
+      icon_name: "Wrench"
     },
     { 
       name: "Jewelry Wire", 
       category: "material" as const,
       purpose: "Connect components",
       is_optional: false,
-      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5BA3D0" stroke-width="2">
-        <path d="M3 12c0-2.8 1.7-5.3 4.2-6.4M21 12c0 2.8-1.7 5.3-4.2 6.4M9 18c-1.5-1-2.5-2.8-2.5-4.8M15 6c1.5 1 2.5 2.8 2.5 4.8"/>
-      </svg>`
+      icon_name: "Cable"
     },
     { 
       name: "Silver Hooks", 
       category: "material" as const,
       purpose: "Earring attachment",
       is_optional: false,
-      icon_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#67B68B" stroke-width="2">
-        <path d="M12 6v12M8 10l4-4 4 4"/>
-        <circle cx="12" cy="18" r="2"/>
-      </svg>`
+      icon_name: "Anchor"
     },
   ],
   materials: [

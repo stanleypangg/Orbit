@@ -38,7 +38,6 @@ interface Message {
   content: string;
   id: string;
   ingredients?: Ingredient[];
-  needsClarification?: boolean;
   clarifyingQuestions?: string[];
   projectOptions?: WorkflowOption[];
   concepts?: WorkflowConcept[];
@@ -226,7 +225,6 @@ export default function Home() {
             content: "I've analyzed your materials! Here's what I found:",
             id: assistantId,
             ingredients: workflowState.ingredients,
-            needsClarification: workflowState.needsInput,
             clarifyingQuestions: workflowState.question
               ? [workflowState.question]
               : [],
@@ -259,7 +257,6 @@ export default function Home() {
           role: "assistant" as const,
           content: workflowState.question!, // Use the question as the main content
           id: questionId,
-          needsClarification: true,
           clarifyingQuestions: [workflowState.question!],
         };
         console.log("Adding question message:", newMessage);
@@ -561,32 +558,24 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Clarifying Questions - Always show if needsClarification is true */}
-                        {message.needsClarification && (
+                        {/* Clarifying Questions - Show when there are questions in the array */}
+                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
                           <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4 mt-2">
                             <h3 className="text-yellow-400 text-lg font-semibold mb-2">
                               ❓ Please Answer
                             </h3>
-                            {message.clarifyingQuestions &&
-                            message.clarifyingQuestions.length > 0 ? (
-                              <ul className="space-y-2">
-                                {message.clarifyingQuestions.map(
-                                  (question, idx) => (
-                                    <li
-                                      key={idx}
-                                      className="text-yellow-200 text-sm"
-                                    >
-                                      • {question}
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            ) : (
-                              <p className="text-yellow-200 text-sm">
-                                Please provide the requested information in the
-                                input below.
-                              </p>
-                            )}
+                            <ul className="space-y-2">
+                              {message.clarifyingQuestions.map(
+                                (question, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="text-yellow-200 text-sm"
+                                  >
+                                    • {question}
+                                  </li>
+                                )
+                              )}
+                            </ul>
                           </div>
                         )}
                       </div>
