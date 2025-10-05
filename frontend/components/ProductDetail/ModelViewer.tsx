@@ -49,16 +49,17 @@ function Model({
         if (!originalMaterial) return;
 
         if (wireframe) {
-          // Wireframe mode: actual wireframe with gray color
+          // Wireframe mode: holographic green wireframe
           // Clone from original to avoid stale state
           const wireMaterial = originalMaterial.clone();
           wireMaterial.wireframe = true;
-          wireMaterial.color.set("#999999");
-          if (wireMaterial.emissive) wireMaterial.emissive.set("#000000");
+          wireMaterial.color.set("#67B68B"); // Holographic green
+          if (wireMaterial.emissive) wireMaterial.emissive.set("#67B68B"); // Glowing effect
           
           // Only set these if the material supports them
-          if ("metalness" in wireMaterial) wireMaterial.metalness = 0;
-          if ("roughness" in wireMaterial) wireMaterial.roughness = 1.0;
+          if ("metalness" in wireMaterial) wireMaterial.metalness = 0.3;
+          if ("roughness" in wireMaterial) wireMaterial.roughness = 0.7;
+          if ("emissiveIntensity" in wireMaterial) wireMaterial.emissiveIntensity = 0.2;
 
           wireMaterial.needsUpdate = true;
           child.material = wireMaterial;
@@ -139,8 +140,8 @@ export default function ModelViewer({
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const [contrast, setContrast] = useState(3.0);
   const [exposure, setExposure] = useState(2.0);
-  const [wireframe, setWireframe] = useState(false); // Default: wireframe OFF
-  const [showColor, setShowColor] = useState(true); // Default: Base Texture Mode ON
+  const [wireframe, setWireframe] = useState(true); // Default: wireframe ON
+  const [showColor, setShowColor] = useState(false); // Default: Base Texture Mode OFF
   const [autoRotate, setAutoRotate] = useState(true); // Default: auto-rotate ON
   const [lightingMode, setLightingMode] = useState<"studio" | "sunset" | "warehouse" | "forest">("studio");
   const [showLightingDropdown, setShowLightingDropdown] = useState(false);
@@ -188,7 +189,7 @@ export default function ModelViewer({
         }
       `}</style>
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 50 }}
+        camera={{ position: [0, 0, 3], fov: 50 }}
         gl={{
           toneMapping: 2, // ACESFilmic tone mapping
           toneMappingExposure: exposure,
