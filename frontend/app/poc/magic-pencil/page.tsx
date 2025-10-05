@@ -39,6 +39,7 @@ function MagicPencilPageContent() {
   const [tool, setTool] = useState<"pencil" | "eraser" | null>(null);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
 
   // History management
@@ -280,6 +281,85 @@ function MagicPencilPageContent() {
     }
   };
 
+  const handleGenerate3D = async () => {
+    if (!uploadedImage) {
+      alert("No image available for 3D generation");
+      return;
+    }
+
+    setIsGenerating3D(true);
+
+    try {
+      // Convert image URL to data URL if needed
+      let processedImageUrl = uploadedImage;
+
+      // If it's a proxy URL (starts with /api/), fetch the actual image
+      if (uploadedImage.startsWith("/api/images/")) {
+        const imgResponse = await fetch(uploadedImage);
+        const blob = await imgResponse.blob();
+        processedImageUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      console.log("[Trellis] Generating 3D model from hero image...");
+      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            images: [processedImageUrl],
+            seed: 1337,
+            randomize_seed: false,
+            texture_size: 2048,
+            mesh_simplify: 0.96,
+            generate_color: true,
+            generate_normal: false,
+            generate_model: true,
+            save_gaussian_ply: false,
+            return_no_background: true,
+            ss_sampling_steps: 26,
+            ss_guidance_strength: 8.0,
+            slat_sampling_steps: 26,
+            slat_guidance_strength: 3.2,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to generate 3D model");
+      }
+
+      const data = await response.json();
+      
+      if (data.model_file) {
+        console.log("[Trellis] ✓ 3D model generated:", data.model_file);
+        
+        // Store for product page
+        const imageHash = btoa(uploadedImage.substring(0, 100));
+        localStorage.setItem("productImage", uploadedImage);
+        localStorage.setItem(`model_${imageHash}`, data.model_file);
+        
+        // Navigate to product page with threadId for polling
+        const params = new URLSearchParams();
+        if (threadId) params.set('thread', threadId);
+        window.location.href = `/product?${params.toString()}`;
+      }
+    } catch (error) {
+      console.error("[Trellis] ❌ Error generating 3D model:", error);
+      alert(error instanceof Error ? error.message : "Failed to generate 3D model");
+    } finally {
+      setIsGenerating3D(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim() || !uploadedImage) return;
 
@@ -360,7 +440,11 @@ function MagicPencilPageContent() {
         // After generation completes, navigate to product page with the final edited image
         const canvasDataUrl = canvas.toDataURL("image/png");
         localStorage.setItem("productImage", canvasDataUrl);
-        window.location.href = "/product";
+        
+        // Include threadId for potential background 3D generation polling
+        const params = new URLSearchParams();
+        if (threadId) params.set('thread', threadId);
+        window.location.href = `/product?${params.toString()}`;
       };
 
       img.onerror = () => {
@@ -601,6 +685,14 @@ function MagicPencilPageContent() {
                   className="w-64 py-3 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
                 >
                   {isGenerating ? "Generating..." : "Generate"}
+                </button>
+                
+                <button
+                  onClick={handleGenerate3D}
+                  disabled={isGenerating3D || !uploadedImage}
+                  className="w-64 py-3 bg-[#5BA3D0] hover:bg-[#4a93c0] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold transition-colors uppercase tracking-wide"
+                >
+                  {isGenerating3D ? "Generating 3D..." : "🎲 Generate 3D Model"}
                 </button>
               </div>
             </div>

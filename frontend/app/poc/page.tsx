@@ -321,6 +321,50 @@ export default function Home() {
       return;
     }
 
+    // OPTIMIZATION: Start 3D generation in background IMMEDIATELY
+    // This runs in parallel with Phase 4 packaging
+    const threadId = workflowState.threadId;
+    if (threadId && selectedConcept.image_url) {
+      console.log("[Parallel] Starting 3D generation in background...");
+      
+      // Convert proxy URL to data URL for Trellis
+      fetch(selectedConcept.image_url)
+        .then(res => res.blob())
+        .then(blob => new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        }))
+        .then(dataUrl => {
+          // Trigger async Trellis generation (fire-and-forget)
+          return fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate-async/${threadId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                images: [dataUrl],
+                seed: 1337,
+                randomize_seed: false,
+                texture_size: 2048,
+                mesh_simplify: 0.96,
+                generate_color: true,
+                generate_normal: false,
+                generate_model: true,
+                save_gaussian_ply: false,
+                return_no_background: true,
+                ss_sampling_steps: 26,
+                ss_guidance_strength: 8.0,
+                slat_sampling_steps: 26,
+                slat_guidance_strength: 3.2,
+              }),
+            }
+          );
+        })
+        .then(() => console.log("[Parallel] ✓ 3D generation triggered in background"))
+        .catch(err => console.error("[Parallel] Failed to trigger 3D generation:", err));
+    }
+
     // Trigger Phase 4 packaging in background (don't await)
     selectConcept(conceptId); // No await - runs in background
 

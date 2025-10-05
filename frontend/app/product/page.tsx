@@ -98,8 +98,11 @@ export default function ProductDetail() {
   useEffect(() => {
     const storedImage = localStorage.getItem("productImage");
     if (storedImage) {
+      console.log("[Product Page] Loading image from storage:", storedImage.substring(0, 50));
       setImageUrl(storedImage);
       // Don't remove productImage yet - we'll use it as a key for model caching
+    } else {
+      console.log("[Product Page] No stored image, using default");
     }
   }, []);
 
@@ -114,9 +117,67 @@ export default function ProductDetail() {
       // Check if we have a cached model for this image
       const cachedModelUrl = localStorage.getItem(cachedModelKey);
       if (cachedModelUrl) {
+        console.log("[Product Page] Using cached 3D model:", cachedModelUrl);
         setModelUrl(cachedModelUrl);
         return;
       }
+      
+      // Check if there's a background generation in progress (from concept selection)
+      const threadId = new URLSearchParams(window.location.search).get('thread');
+      if (threadId) {
+        console.log("[Product Page] Checking for background generation...");
+        const pollStatus = async () => {
+          try {
+            const statusResponse = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/status/${threadId}`
+            );
+            
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
+              
+              if (statusData.status === "complete" && statusData.model_file) {
+                console.log("[Product Page] ✓ Background generation complete!");
+                const modelUrlWithCacheBust = `${statusData.model_file}?_cb=${Date.now()}`;
+                setModelUrl(modelUrlWithCacheBust);
+                localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
+                setIsGenerating(false);
+                return true; // Stop polling
+              } else if (statusData.status === "error") {
+                console.error("[Product Page] Background generation failed:", statusData.message);
+                setError(statusData.message);
+                setIsGenerating(false);
+                return true; // Stop polling
+              } else {
+                // Still processing
+                console.log(`[Product Page] Background generation: ${statusData.progress}%`);
+                return false; // Continue polling
+              }
+            }
+          } catch (err) {
+            console.log("[Product Page] No background generation found, will generate now");
+          }
+          return true; // Stop polling on error
+        };
+        
+        // Poll every 3 seconds
+        setIsGenerating(true);
+        const checkStatus = async () => {
+          const shouldStop = await pollStatus();
+          if (!shouldStop) {
+            setTimeout(checkStatus, 3000);
+          }
+        };
+        
+        const initialCheck = await pollStatus();
+        if (!initialCheck) {
+          setTimeout(checkStatus, 3000);
+          return; // Exit and let polling handle it
+        }
+        
+        // If no background job found, fall through to generate now
+      }
+      
+      console.log("[Product Page] No cached model found, generating new 3D model...");
 
       // Reset model URL to prevent showing old model
       setModelUrl(undefined);
@@ -127,8 +188,9 @@ export default function ProductDetail() {
         // Convert local image path to full URL or data URL
         let processedImageUrl = imageUrl;
 
-        // If it's a local path (starts with /), convert to data URL
-        if (imageUrl.startsWith("/") && !imageUrl.startsWith("http")) {
+        // If it's a local path or proxy path, convert to data URL
+        if ((imageUrl.startsWith("/") || imageUrl.startsWith("/api/")) && !imageUrl.startsWith("http")) {
+          console.log("[Product Page] Converting image to data URL for Trellis...");
           // Fetch the local image and convert to data URL
           const imgResponse = await fetch(imageUrl);
           const blob = await imgResponse.blob();
