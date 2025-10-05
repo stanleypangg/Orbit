@@ -88,6 +88,8 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [animationPhase, setAnimationPhase] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conceptsRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [animatedMessageIds, setAnimatedMessageIds] = useState<Set<string>>(
     new Set()
   );
@@ -97,6 +99,12 @@ export default function Home() {
   >([]);
   const [pageLoaded, setPageLoaded] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("");
+  
+  // Phase 3 concept focus mode
+  const [isConceptFocusMode, setIsConceptFocusMode] = useState(false);
+  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
+  const [isScrolledAway, setIsScrolledAway] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Fade-in animation on page load
   useEffect(() => {
@@ -431,9 +439,27 @@ export default function Home() {
   };
 
   const handleConceptSelect = async (conceptId: string) => {
+    // Set selected concept
+    setSelectedConceptId(conceptId);
+    
+    // Scroll to bottom to reveal confirmation bar after a short delay
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'end'
+      });
+    }, 300);
+  };
+
+  const handleConceptConfirm = async () => {
+    if (!selectedConceptId) return;
+    
+    // Start transition animation
+    setIsTransitioning(true);
+    
     // Find the selected concept
     const selectedConcept = workflowState.concepts.find(
-      (c) => c.concept_id === conceptId
+      (c) => c.concept_id === selectedConceptId
     );
 
     if (!selectedConcept) {
@@ -505,18 +531,34 @@ export default function Home() {
     }
 
     // Trigger Phase 4 packaging in background (don't await)
-    selectConcept(conceptId); // No await - runs in background
+    selectConcept(selectedConceptId); // No await - runs in background
 
-    // Immediately navigate to Magic Pencil with the hero image
-    // Note: image_url is already proxied via useWorkflow for optimal caching
-    const params = new URLSearchParams({
-      imageUrl: selectedConcept.image_url, // Already proxied: /api/images/{imageId}
-      title: selectedConcept.title,
-      threadId: workflowState.threadId || "",
-      conceptId: conceptId,
+    // Wait for transition animation to complete before navigating
+    setTimeout(() => {
+      // Navigate to Magic Pencil with the hero image
+      // Note: image_url is already proxied via useWorkflow for optimal caching
+      const params = new URLSearchParams({
+        imageUrl: selectedConcept.image_url, // Already proxied: /api/images/{imageId}
+        title: selectedConcept.title,
+        threadId: workflowState.threadId || "",
+        conceptId: selectedConceptId,
+      });
+
+      window.location.href = `/poc/magic-pencil?${params.toString()}`;
+    }, 1000);
+  };
+
+  const handleGoBack = () => {
+    // Refresh the page to restart
+    window.location.reload();
+  };
+
+  const handleScrollToConcepts = () => {
+    conceptsRef.current?.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'center' 
     });
-
-    window.location.href = `/poc/magic-pencil?${params.toString()}`;
+    setIsScrolledAway(false);
   };
 
   // Handle workflow concept selection - Add concepts to messages
@@ -567,6 +609,18 @@ export default function Home() {
           },
         ]);
         setAnimatedMessageIds((prev) => new Set([...prev, conceptsId]));
+        
+        // Enter concept focus mode after a short delay for smooth transition
+        setTimeout(() => {
+          setIsConceptFocusMode(true);
+          // Smooth scroll to concepts
+          setTimeout(() => {
+            conceptsRef.current?.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }, 300);
+        }, 600);
       }
     }
   }, [
@@ -574,6 +628,44 @@ export default function Home() {
     workflowState.selectionType,
     workflowState.concepts,
   ]);
+
+  // Scroll detection for concept focus mode (with debouncing to prevent flicker)
+  useEffect(() => {
+    if (!isConceptFocusMode || !chatContainerRef.current || !conceptsRef.current) return;
+
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      if (!chatContainerRef.current || !conceptsRef.current) return;
+      
+      // Clear existing timeout to debounce
+      clearTimeout(scrollTimeout);
+      
+      // Wait 100ms after scroll ends before updating state
+      scrollTimeout = setTimeout(() => {
+        if (!chatContainerRef.current || !conceptsRef.current) return;
+        
+        const containerRect = chatContainerRef.current.getBoundingClientRect();
+        const conceptsRect = conceptsRef.current.getBoundingClientRect();
+        
+        // Check if concepts are out of view (not centered)
+        const conceptsCenter = conceptsRect.top + conceptsRect.height / 2;
+        const containerCenter = containerRect.top + containerRect.height / 2;
+        const distanceFromCenter = Math.abs(conceptsCenter - containerCenter);
+        
+        // If concepts are more than 200px from center, mark as scrolled away
+        setIsScrolledAway(distanceFromCenter > 200);
+      }, 100);
+    };
+
+    const container = chatContainerRef.current;
+    container.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [isConceptFocusMode]);
 
   const handleExampleClick = (text: string) => {
     setPrompt(text);
@@ -608,11 +700,12 @@ export default function Home() {
             opacity: pageLoaded ? 1 : 0,
           }}
         >
-          {/* Messages Area - Fixed height, no resizing */}
+          {/* Messages Area - Expands when in focus mode */}
           <div
-            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto"
+            ref={chatContainerRef}
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto relative transition-all duration-500 ease-out"
             style={{
-              height: "calc(100vh - 280px)",
+              height: isConceptFocusMode ? "calc(100vh - 180px)" : "calc(100vh - 280px)",
             }}
           >
             <div className="space-y-4">
@@ -813,50 +906,83 @@ export default function Home() {
 
                     {/* Render Concept Images if present */}
                     {message.concepts && message.concepts.length > 0 && (
-                      <div className="mt-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          {message.concepts.map((concept) => (
-                            <div
-                              key={concept.concept_id}
-                              onClick={() =>
-                                handleConceptSelect(concept.concept_id)
-                              }
-                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] cursor-pointer transition-all hover:scale-[1.02]"
-                              style={{
-                                animation: "fadeIn 0.5s ease-out forwards",
-                              }}
-                            >
-                              {concept.image_url && (
-                                <div className="w-full aspect-square bg-[#232937] overflow-hidden">
-                                  <img
-                                    src={concept.image_url}
-                                    alt={concept.title}
-                                    className="w-full h-full object-contain"
-                                  />
-                                </div>
-                              )}
-                              <div className="p-3">
-                                <h4 className="text-white font-semibold text-sm font-mono mb-1">
-                                  {concept.title}
-                                </h4>
-                                {concept.description && (
-                                  <p className="text-gray-400 text-xs mt-1 font-mono line-clamp-2">
-                                    {concept.description}
-                                  </p>
-                                )}
-                                {concept.style && (
-                                  <div className="mt-2 flex items-center gap-1">
-                                    <span className="text-[#4ade80] text-xs font-mono">
-                                      🎨
-                                    </span>
-                                    <span className="text-[#4ade80] text-xs font-mono capitalize">
-                                      {concept.style}
-                                    </span>
+                      <div 
+                        ref={conceptsRef}
+                        className="mt-4"
+                      >
+                        {/* Focus mode header */}
+                        {isConceptFocusMode && (
+                          <div className="mb-8 text-center animate-fadeIn">
+                            <h3 className="text-[#4ade80] font-mono text-lg font-semibold uppercase tracking-wider mb-2">
+                              ✨ Choose Your Favorite Concept
+                            </h3>
+                            <p className="text-[#B1AFAF] text-sm font-mono">
+                              Click to select, then confirm your choice below
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-3 gap-6">
+                          {message.concepts.map((concept) => {
+                            const isSelected = selectedConceptId === concept.concept_id;
+                            const isOtherSelected = selectedConceptId && selectedConceptId !== concept.concept_id;
+                            
+                            return (
+                              <div
+                                key={concept.concept_id}
+                                onClick={() => handleConceptSelect(concept.concept_id)}
+                                className={`bg-[#1a2030] border-[0.5px] cursor-pointer transition-all duration-300 ${
+                                  isSelected 
+                                    ? 'border-[#4ade80] shadow-[0_0_20px_rgba(74,222,128,0.3)] scale-105 ring-2 ring-[#4ade80]/50' 
+                                    : isOtherSelected
+                                    ? 'border-[#3a4560] opacity-40 scale-95'
+                                    : 'border-[#3a4560] hover:border-[#4ade80] hover:scale-[1.02]'
+                                }`}
+                                style={{
+                                  animationName: isConceptFocusMode ? "popIn" : "fadeIn",
+                                  animationDuration: isConceptFocusMode ? "0.6s" : "0.5s",
+                                  animationTimingFunction: isConceptFocusMode ? "cubic-bezier(0.68, -0.55, 0.265, 1.55)" : "ease-out",
+                                  animationFillMode: "forwards",
+                                  animationDelay: `${(message.concepts?.indexOf(concept) || 0) * 0.15}s`,
+                                }}
+                              >
+                                {isSelected && (
+                                  <div className="absolute -top-3 -right-3 bg-[#4ade80] text-black w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg z-10 animate-bounce">
+                                    ✓
                                   </div>
                                 )}
+                                {concept.image_url && (
+                                  <div className="w-full aspect-square bg-[#232937] overflow-hidden relative">
+                                    <img
+                                      src={concept.image_url}
+                                      alt={concept.title}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                )}
+                                <div className="p-4">
+                                  <h4 className="text-white font-semibold text-base font-mono mb-1">
+                                    {concept.title}
+                                  </h4>
+                                  {concept.description && (
+                                    <p className="text-gray-400 text-xs mt-1 font-mono line-clamp-2">
+                                      {concept.description}
+                                    </p>
+                                  )}
+                                  {concept.style && (
+                                    <div className="mt-2 flex items-center gap-1">
+                                      <span className="text-[#4ade80] text-xs font-mono">
+                                        🎨
+                                      </span>
+                                      <span className="text-[#4ade80] text-xs font-mono capitalize">
+                                        {concept.style}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -893,37 +1019,74 @@ export default function Home() {
 
               <div ref={messagesEndRef} />
             </div>
+            
+            {/* Scroll-away indicator - shows when concepts are out of focus */}
+            {isConceptFocusMode && isScrolledAway && !selectedConceptId && (
+              <div 
+                className="fixed bottom-24 left-1/2 z-20 animate-fadeIn"
+                style={{
+                  transform: 'translateX(-50%)',
+                  animation: 'fadeIn 0.3s ease-out, bounce 1s infinite 0.3s'
+                }}
+              >
+                <button
+                  onClick={handleScrollToConcepts}
+                  className="bg-[#4ade80] hover:bg-[#3bc970] text-black px-6 py-3 rounded-full shadow-lg flex items-center gap-2 font-mono font-semibold transition-colors"
+                >
+                  <span>↓</span>
+                  <span>View Concepts</span>
+                  <span>↓</span>
+                </button>
+              </div>
+            )}
+            
+            {/* Transition Overlay */}
+            {isTransitioning && (
+              <div className="fixed inset-0 bg-[#161924] flex items-center justify-center z-40">
+                <div className="text-center">
+                  <div className="flex space-x-2 mb-4 justify-center">
+                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                  </div>
+                  <p className="text-[#4ade80] text-xl font-mono font-semibold animate-pulse">
+                    Preparing your project...
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Chat Input - Fades in from below */}
-          <div
-            className="mt-4 transition-all duration-700 ease-out"
-            style={{
-              transform:
-                animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
-              opacity: animationPhase >= 7 ? 1 : 0,
-              pointerEvents: animationPhase >= 7 ? "auto" : "none",
-            }}
-          >
-            <div className="relative">
-              <textarea
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Continue the conversation..."
-                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
-                rows={2}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!chatInput.trim() || workflowState.isLoading}
-                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
-              >
+          {/* Chat Input - Hidden when in focus mode */}
+          {!isConceptFocusMode && (
+            <div
+              className="mt-4 transition-all duration-700 ease-out"
+              style={{
+                transform:
+                  animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
+                opacity: animationPhase >= 7 ? 1 : 0,
+                pointerEvents: animationPhase >= 7 ? "auto" : "none",
+              }}
+            >
+              <div className="relative">
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Continue the conversation..."
+                  className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
+                  rows={2}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!chatInput.trim() || workflowState.isLoading}
+                  className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
+                >
                 {workflowState.isLoading ? (
                   <span className="flex items-center gap-2">
                     <div className="flex space-x-1">
@@ -948,29 +1111,56 @@ export default function Home() {
               </button>
             </div>
           </div>
+          )}
 
-          {/* Placeholder button for Magic Pencil */}
-          <Link
-            href={{
-              pathname: "/poc/magic-pencil",
-              query: { image: "/pikachu.webp" },
-            }}
-            className="fixed bottom-8 right-8 z-50"
-          >
-            <button className="bg-[#4ade80] hover:bg-[#3bc970] text-black font-semibold px-6 py-3 shadow-lg transition-all duration-300 flex items-center gap-2 hover:scale-105 font-mono">
-              <span>✨</span>
-              <span>Magic Pencil</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-5 h-5"
-              >
-                <path d="M21.731 2.269a2.625 2.625 0 00-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 000-3.712zM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 00-1.32 2.214l-.8 2.685a.75.75 0 00.933.933l2.685-.8a5.25 5.25 0 002.214-1.32l8.4-8.4z" />
-                <path d="M5.25 5.25a3 3 0 00-3 3v10.5a3 3 0 003 3h10.5a3 3 0 003-3V13.5a.75.75 0 00-1.5 0v5.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5V8.25a1.5 1.5 0 011.5-1.5h5.25a.75.75 0 000-1.5H5.25z" />
-              </svg>
-            </button>
-          </Link>
+          {/* Concept Confirmation Button - Shows when concept is selected */}
+          {isConceptFocusMode && selectedConceptId && (
+            <div className="mt-4 animate-fadeIn">
+              <div className="bg-[#1a2030] border-[0.5px] border-[#4ade80] p-6">
+                <div className="flex items-center justify-between gap-6">
+                  <div className="flex-1">
+                    <p className="text-[#B1AFAF] text-sm font-mono mb-1">
+                      Selected Concept:
+                    </p>
+                    <p className="text-white text-lg font-semibold font-mono">
+                      {workflowState.concepts.find(c => c.concept_id === selectedConceptId)?.title}
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleGoBack}
+                      disabled={isTransitioning}
+                      className="px-8 py-4 bg-[#232937] hover:bg-[#2a3142] text-white font-mono font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-[0.5px] border-[#4ade80]/30 hover:border-[#4ade80]"
+                    >
+                      ← Go Back
+                    </button>
+                    <button
+                      onClick={handleConceptConfirm}
+                      disabled={isTransitioning}
+                      className="px-12 py-4 bg-[#4ade80] hover:bg-[#3bc970] text-black font-mono font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider shadow-lg hover:shadow-xl hover:scale-105"
+                    >
+                      {isTransitioning ? (
+                        <span className="flex items-center gap-2">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                          </div>
+                          <span>Processing</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span>Confirm & Continue</span>
+                          <span>→</span>
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     );
