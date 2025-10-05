@@ -72,7 +72,7 @@ function MagicPencilPageContent() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      console.log('[Magic Pencil] Loading image:', uploadedImage);
+      console.log('[Magic Pencil] Loading image:', uploadedImage.substring(0, 100) + '...');
       
       const img = new window.Image();
       // No need for CORS when using proxy URL (same-origin)
@@ -82,7 +82,7 @@ function MagicPencilPageContent() {
       img.src = uploadedImage;
       
       img.onload = () => {
-        console.log('[Magic Pencil] ✓ Image loaded successfully:', uploadedImage);
+        console.log('[Magic Pencil] ✓ Image loaded successfully');
         canvas.width = img.width;
         canvas.height = img.height;
 
@@ -96,7 +96,7 @@ function MagicPencilPageContent() {
       };
 
       img.onerror = (e) => {
-        console.error('[Magic Pencil] ❌ Failed to load image:', uploadedImage);
+        console.error('[Magic Pencil] ❌ Failed to load image');
         console.error('[Magic Pencil] Error details:', e);
         console.error('[Magic Pencil] Is proxied?', uploadedImage.startsWith('/api/images/'));
       };

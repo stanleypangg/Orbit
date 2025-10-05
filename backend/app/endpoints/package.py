@@ -32,8 +32,13 @@ async def get_final_package(thread_id: str) -> Dict[str, Any]:
         package_data = redis_service.get(package_key)
         
         if package_data:
+            parsed_data = json.loads(package_data)
             logger.info(f"Retrieved final package for thread {thread_id}")
-            return json.loads(package_data)
+            logger.info(f"  - Keys in package: {list(parsed_data.keys())}")
+            logger.info(f"  - Has detailed_esg_metrics: {'detailed_esg_metrics' in parsed_data}")
+            if 'detailed_esg_metrics' in parsed_data:
+                logger.info(f"  - ESG keys: {list(parsed_data['detailed_esg_metrics'].keys()) if parsed_data['detailed_esg_metrics'] else 'None'}")
+            return parsed_data
         
         # If not found, check for essential package
         essential_key = f"package_essential:{thread_id}"

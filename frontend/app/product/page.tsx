@@ -9,6 +9,7 @@ import ModelViewer from "@/components/ProductDetail/ModelViewer";
 import MaterialsCarousel from "@/components/ProductDetail/MaterialsCarousel";
 import Storyboard from "@/components/ProductDetail/Storyboard";
 import ToolsAndMaterialsSection from "@/components/ProductDetail/ToolsAndMaterialsSection";
+import TerminalLoader from "@/components/ProductDetail/TerminalLoader";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -80,13 +81,15 @@ export default function ProductDetail() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [packageData, setPackageData] = useState<ProductPackage | null>(null);
-  const [isLoadingPackage, setIsLoadingPackage] = useState(false);
+  const [isLoadingPackage, setIsLoadingPackage] = useState(true); // Start true
+  const [showLoader, setShowLoader] = useState(false); // Only show after delay
+  const [loaderMounted, setLoaderMounted] = useState(false); // Track if loader was ever needed
 
   // Get image from localStorage on mount
   useEffect(() => {
     const storedImage = localStorage.getItem("productImage");
     if (storedImage) {
-      console.log("[Product Page] Loading image from storage:", storedImage.substring(0, 50));
+      console.log("[Product Page] ✓ Loaded image from storage");
       setImageUrl(storedImage);
     } else {
       console.log("[Product Page] No stored image, using default");
@@ -98,14 +101,23 @@ export default function ProductDetail() {
     const fetchPackageData = async () => {
       if (!threadId) {
         console.log("[Product Page] No thread ID, skipping package fetch");
+        setIsLoadingPackage(false);
         return;
       }
 
-      setIsLoadingPackage(true);
-      
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const packageUrl = `${apiUrl}/api/package/package/${threadId}`;
       console.log("[Product Page] Fetching package from:", packageUrl);
+      
+      // Track if we should show loader (will be cancelled if data arrives quickly)
+      let shouldShowLoader = true;
+      const loaderTimeout = setTimeout(() => {
+        if (shouldShowLoader) {  // Only show if NOT cancelled
+          console.log("[Product Page] ⏱️ Data taking >500ms, showing loader...");
+          setLoaderMounted(true);
+          setShowLoader(true);
+        }
+      }, 500);
       
       try {
         const response = await fetch(packageUrl);
@@ -121,9 +133,11 @@ export default function ProductDetail() {
         }
 
         const data = await response.json();
-        console.log("[Product Page] ✓ Loaded package data:", data);
-        console.log("[Product Page] ESG Metrics:", data.detailed_esg_metrics);
-        console.log("[Product Page] Overall ESG Score:", data.detailed_esg_metrics?.overall_esg_score);
+        console.log("[Product Page] ✓ Loaded package data:");
+        console.log("  - Keys in data:", Object.keys(data));
+        console.log("  - detailed_esg_metrics present?", !!data.detailed_esg_metrics);
+        console.log("  - Full ESG structure:", JSON.stringify(data.detailed_esg_metrics, null, 2));
+        console.log("  - Overall ESG Score:", data.detailed_esg_metrics?.overall_esg_score);
         
         // Check if this is essential package (no ESG yet) or full package
         if (!data.detailed_esg_metrics) {
@@ -134,12 +148,17 @@ export default function ProductDetail() {
         }
         
         setPackageData(data);
+        shouldShowLoader = false; // Cancel loader mount if data arrived quickly
+        clearTimeout(loaderTimeout);
+        setIsLoadingPackage(false);
+        setShowLoader(false); // Hide loader animation immediately when data arrives
+        console.log("[Product Page] ✓ Package loaded, loader mounted:", loaderMounted);
       } catch (err) {
         console.error("[Product Page] Error loading package data:", err);
-        // Don't throw error - just use fallback data
-        // This allows the page to work even if backend is not ready
-      } finally {
+        shouldShowLoader = false;
+        clearTimeout(loaderTimeout);
         setIsLoadingPackage(false);
+        setShowLoader(false);
       }
     };
 
@@ -228,101 +247,21 @@ export default function ProductDetail() {
           return; // Exit and let polling handle it
         }
         
-          // If polling stopped and no model, fall through to generate now
-          if (!modelUrl) {
-            console.log("[Product Page] Background job not found, will generate now");
-          } else {
-            return; // Model is set, we're done
-          }
+        // If polling stopped but no model yet, don't generate - just show placeholder
+        if (!modelUrl) {
+          console.log("[Product Page] Background job status unclear, skipping 3D generation on product page");
+          setIsGenerating(false);
+          return; // Don't generate on product page!
+        } else {
+          return; // Model is set, we're done
         }
       }
+    }
       
-      console.log("[Product Page] No cached model found, generating new 3D model...");
-
-      // Reset model URL to prevent showing old model
-      setModelUrl(undefined);
-      setIsGenerating(true);
-      setError(null);
-      
-      // Mark as queued to prevent duplicates
-      if (threadId) {
-        const trellisKey = `trellis_queued_${threadId}`;
-        localStorage.setItem(trellisKey, "true");
-      }
-
-      try {
-        // Convert local image path to full URL or data URL
-        let processedImageUrl = imageUrl;
-
-        // If it's a local path or proxy path, convert to data URL
-        if ((imageUrl.startsWith("/") || imageUrl.startsWith("/api/")) && !imageUrl.startsWith("http")) {
-          console.log("[Product Page] Converting image to data URL for Trellis...");
-          // Fetch the local image and convert to data URL
-          const imgResponse = await fetch(imageUrl);
-          const blob = await imgResponse.blob();
-          processedImageUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        }
-
-        // Add timestamp to prevent caching issues
-        const timestamp = Date.now();
-        const response = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-          }/trellis/generate?_t=${timestamp}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              images: [processedImageUrl],
-              seed: 1337,
-              randomize_seed: false,
-              texture_size: 2048,
-              mesh_simplify: 0.96,
-              generate_color: true,
-              generate_normal: false,
-              generate_model: true,
-              save_gaussian_ply: false,
-              return_no_background: true,
-              ss_sampling_steps: 26,
-              ss_guidance_strength: 8.0,
-              slat_sampling_steps: 26,
-              slat_guidance_strength: 3.2,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || "Failed to generate 3D model");
-        }
-
-        const data = await response.json();
-        if (data.model_file) {
-          // Add cache-busting parameter to force reload
-          const modelUrlWithCacheBust = `${data.model_file}${
-            data.model_file.includes("?") ? "&" : "?"
-          }_cb=${Date.now()}`;
-          setModelUrl(modelUrlWithCacheBust);
-
-          // Cache the model URL for this image
-          const imageHash = btoa(imageUrl.substring(0, 100));
-          const cachedModelKey = `model_${imageHash}`;
-          localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
-        }
-      } catch (err) {
-        console.error("Error generating 3D model:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to generate 3D model"
-        );
-      } finally {
+    console.log("[Product Page] No background job found, skipping 3D generation on product page");
+    // DON'T generate 3D models on the product page - they should be generated during the workflow
+    // This avoids duplicate generations and expensive Replicate API calls
         setIsGenerating(false);
-      }
     };
 
     generate3DModel();
@@ -335,8 +274,18 @@ export default function ProductDetail() {
   const esgMetrics = packageData?.detailed_esg_metrics;
   const hasRealESGData = !!(esgMetrics?.overall_esg_score);
   
+  // Track what data we actually have for the loader
+  const hasToolsData = !!(packageData?.detailed_tools_and_materials?.tools?.length || packageData?.detailed_tools_and_materials?.materials?.length);
+  const hasInstructions = !!(packageData?.project_documentation?.detailed_instructions?.length);
+  
   // Log whether we're using real or fallback data
-  console.log("[Product Page] Using real ESG data:", hasRealESGData);
+  console.log("[Product Page] Data status:", {
+    hasESGData: hasRealESGData,
+    hasToolsData,
+    hasInstructions,
+    has3DModel: !!modelUrl,
+    showLoader
+  });
   if (hasRealESGData) {
     console.log("[Product Page] Real ESG scores:", {
       overall: esgMetrics?.overall_esg_score,
@@ -403,6 +352,17 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
+      {/* Terminal Loading Screen - only mount if data takes >500ms */}
+      {loaderMounted && (
+        <TerminalLoader 
+          isLoading={showLoader}
+          hasESGData={hasRealESGData}
+          has3DModel={!!modelUrl}
+          hasToolsData={hasToolsData}
+          hasInstructions={hasInstructions}
+        />
+      )}
+      
       {/* Main Content */}
       <div className="max-w-[1440px] mx-auto p-8">
         {/* Product Header */}

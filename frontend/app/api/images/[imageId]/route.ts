@@ -18,9 +18,9 @@ function cleanCache() {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { imageId: string } }
+  { params }: { params: Promise<{ imageId: string }> }
 ) {
-  const { imageId } = params;
+  const { imageId } = await params;
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
   try {

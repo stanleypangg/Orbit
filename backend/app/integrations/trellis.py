@@ -100,7 +100,15 @@ class TrellisService:
             # Log all input parameters
             for key, value in input_data.items():
                 if key == "images":
-                    logger.info(f"  {key}: {value[:100]}..." if isinstance(value, list) and len(str(value)) > 100 else f"  {key}: {value}")
+                    # Log only the count and first 100 chars of each image
+                    if isinstance(value, list):
+                        img_info = f"[{len(value)} image(s)]"
+                        if len(value) > 0:
+                            first_img = str(value[0])
+                            img_info += f" First: {first_img[:100]}..."
+                        logger.info(f"  {key}: {img_info}")
+                    else:
+                        logger.info(f"  {key}: [invalid format]")
                 else:
                     logger.info(f"  {key}: {value}")
             logger.info("-" * 80)

@@ -297,7 +297,7 @@ async def _extract_detailed_tools(
     ingredients: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """Extract detailed tool requirements with AI, excluding original ingredients."""
-    from app.ai_service.production_gemini import production_call_gemini
+    from app.ai_service.production_gemini import call_gemini_with_retry as production_call_gemini
     
     basic_tools = selected_option.get("tools_required", [])
     project_title = selected_option.get("title", "DIY Project")
@@ -449,7 +449,7 @@ async def _calculate_detailed_esg_metrics(
     project_context: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Use AI to calculate detailed, researched ESG metrics for the project."""
-    from app.ai_service.production_gemini import production_call_gemini
+    from app.ai_service.production_gemini import call_gemini_with_retry as production_call_gemini
     
     materials_list = ", ".join([ing.get("name", ing.get("material", "")) for ing in ingredients])
     project_title = selected_option.get("title", project_context.get("title", "DIY Project"))

@@ -109,3 +109,13 @@ input[type="range"]::-moz-range-thumb:hover {
   background: #3bc970;
   border-color: #3bc970;
 }
+
+/* Terminal Loading Animation */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
