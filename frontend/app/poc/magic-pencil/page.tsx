@@ -21,8 +21,7 @@ export default function MagicPencilPage() {
     imageFromQuery
   );
   const [isDrawing, setIsDrawing] = useState(false);
-  const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
-  const [showPrompt, setShowPrompt] = useState(false);
+  const [tool, setTool] = useState<"pencil" | "eraser" | null>(null);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
@@ -132,6 +131,8 @@ export default function MagicPencilPage() {
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!tool) return; // Don't allow drawing if no tool is selected
+
     const coords = getCanvasCoordinates(e);
     if (!coords) return;
 
@@ -320,7 +321,6 @@ export default function MagicPencilPage() {
         saveToHistory(data.result_image_url);
 
         setIsGenerating(false);
-        setShowPrompt(false);
         setPrompt("");
       };
 
@@ -368,11 +368,13 @@ export default function MagicPencilPage() {
             <div className="relative p-8">
               {/* Tools Component - Compact Top Left */}
               <div className="absolute top-8 left-8 z-10 w-48 border-[0.5px] border-[#67B68B] bg-[#2A3038] p-4">
-                <h3 className="text-white text-xs font-normal mb-4">Tools</h3>
+                <h3 className="text-md text-[#67B68B] font-normal mb-4">
+                  Tools
+                </h3>
 
                 {/* Brush Size */}
                 <div className="mb-4">
-                  <label className="text-white text-[10px] font-normal mb-2 block">
+                  <label className="text-white text-xs tracking-wider font-normal block">
                     Brush Size
                   </label>
                   <input
@@ -394,7 +396,7 @@ export default function MagicPencilPage() {
 
                 {/* Brush Colour */}
                 <div className="mb-4">
-                  <label className="text-white text-[10px] font-normal mb-2 block">
+                  <label className="text-white text-xs tracking-wider font-normal mb-2 block">
                     Brush Colour
                   </label>
                   <div className="flex gap-1.5">
@@ -414,44 +416,46 @@ export default function MagicPencilPage() {
                   </div>
                 </div>
 
-                {/* Tool Icons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTool("pencil")}
-                    disabled={!uploadedImage}
-                    className={`flex-1 h-16 flex items-center justify-center transition-all disabled:opacity-30 border border-[#67B68B]/30 ${
-                      tool === "pencil"
-                        ? "bg-[#67B68B]/20"
-                        : "hover:bg-[#67B68B]/10"
-                    }`}
-                    title="Pencil"
-                  >
-                    <Image
-                      src="/edit/pencil.png"
-                      alt="Pencil"
-                      width={40}
-                      height={40}
-                      className="w-auto h-auto max-w-[40px] max-h-[40px]"
-                    />
-                  </button>
-                  <button
-                    onClick={() => setTool("eraser")}
-                    disabled={!uploadedImage}
-                    className={`flex-1 h-16 flex items-center justify-center transition-all disabled:opacity-30 border border-[#67B68B]/30 ${
-                      tool === "eraser"
-                        ? "bg-[#67B68B]/20"
-                        : "hover:bg-[#67B68B]/10"
-                    }`}
-                    title="Eraser"
-                  >
-                    <Image
-                      src="/edit/eraser.png"
-                      alt="Eraser"
-                      width={40}
-                      height={40}
-                      className="w-auto h-auto max-w-[40px] max-h-[40px]"
-                    />
-                  </button>
+                {/* Tool Icons - Animated Peek */}
+                <div className="relative h-20 overflow-hidden -mb-4">
+                  <div className="flex -space-x-2">
+                    <button
+                      onClick={() => setTool("pencil")}
+                      disabled={!uploadedImage}
+                      className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
+                        tool === "pencil"
+                          ? "translate-y-0"
+                          : "translate-y-10 hover:translate-y-8"
+                      }`}
+                      title="Pencil"
+                    >
+                      <Image
+                        src="/edit/pencil.svg"
+                        alt="Pencil"
+                        width={90}
+                        height={70}
+                        className="w-auto h-auto max-w-[70px] max-h-[70px]"
+                      />
+                    </button>
+                    <button
+                      onClick={() => setTool("eraser")}
+                      disabled={!uploadedImage}
+                      className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
+                        tool === "eraser"
+                          ? "translate-y-0"
+                          : "translate-y-10 hover:translate-y-8"
+                      }`}
+                      title="Eraser"
+                    >
+                      <Image
+                        src="/edit/eraser.png"
+                        alt="Eraser"
+                        width={70}
+                        height={70}
+                        className="w-auto h-auto max-w-[70px] max-h-[70px]"
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -470,13 +474,15 @@ export default function MagicPencilPage() {
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                       onMouseMove={handleMouseMove}
-                      className="max-w-full max-h-full cursor-none"
+                      className={`max-w-full max-h-full ${
+                        tool ? "cursor-none" : "cursor-default"
+                      }`}
                       style={{
                         imageRendering: "crisp-edges",
                       }}
                     />
                     {/* Custom Cursor */}
-                    {cursorPos && (
+                    {cursorPos && tool && (
                       <div
                         className="absolute pointer-events-none"
                         style={{
@@ -516,115 +522,8 @@ export default function MagicPencilPage() {
                 )}
               </div>
 
-              {/* Tools Bar - Always visible */}
-              <div className="mt-6 bg-[#2D3642] border border-[#67B68B] px-6 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  {/* Undo/Redo */}
-                  <div className="flex">
-                    <button
-                      onClick={undo}
-                      disabled={!uploadedImage || historyIndex <= 0}
-                      className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Image
-                        src="/edit/undo.svg"
-                        alt="Undo"
-                        width={24}
-                        height={24}
-                      />
-                    </button>
-                    <button
-                      onClick={redo}
-                      disabled={
-                        !uploadedImage || historyIndex >= history.length - 1
-                      }
-                      className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Image
-                        src="/edit/redo.svg"
-                        alt="Redo"
-                        width={24}
-                        height={24}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Tools */}
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setTool("pencil")}
-                      disabled={!uploadedImage}
-                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                        tool === "pencil" ? "" : "hover:bg-[#454D5A]"
-                      }`}
-                    >
-                      <Image
-                        src="/edit/pencil.png"
-                        alt="Pencil"
-                        width={100}
-                        height={100}
-                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
-                      />
-                    </button>
-                    <button
-                      onClick={() => setTool("eraser")}
-                      disabled={!uploadedImage}
-                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                        tool === "eraser" ? "" : "hover:bg-[#454D5A]"
-                      }`}
-                    >
-                      <Image
-                        src="/edit/eraser.png"
-                        alt="Eraser"
-                        width={100}
-                        height={100}
-                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
-                      />
-                    </button>
-                    <button
-                      onClick={() => setShowPrompt(!showPrompt)}
-                      disabled={!uploadedImage}
-                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                        showPrompt ? "" : "hover:bg-[#454D5A]"
-                      }`}
-                    >
-                      <Image
-                        src="/edit/note.png"
-                        alt="Note"
-                        width={100}
-                        height={100}
-                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Generate & Skip Buttons */}
-                <div className="flex flex-col gap-2 items-center">
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !showPrompt || !prompt.trim()}
-                    className="w-[400px] py-4 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
-                  >
-                    {isGenerating ? "Generating..." : "Generate"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Store image in localStorage to pass to product page
-                      if (uploadedImage) {
-                        localStorage.setItem("productImage", uploadedImage);
-                      }
-                      window.location.href = "/product";
-                    }}
-                    className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-
               {/* Prompt Input */}
-              {showPrompt && uploadedImage && (
+              {uploadedImage && (
                 <div className="mt-6 border-[0.5px] border-[#67B68B] bg-[#2A3344] p-6">
                   <label className="block text-[#67B68B] text-sm mb-4 tracking-wide font-normal">
                     Describe your Change
@@ -637,6 +536,29 @@ export default function MagicPencilPage() {
                   />
                 </div>
               )}
+
+              {/* Action Buttons */}
+              <div className="mt-6 flex items-center justify-end gap-8">
+                <button
+                  onClick={() => {
+                    // Store image in localStorage to pass to product page
+                    if (uploadedImage) {
+                      localStorage.setItem("productImage", uploadedImage);
+                    }
+                    window.location.href = "/product";
+                  }}
+                  className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !prompt.trim()}
+                  className="px-24 py-4 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
+                >
+                  {isGenerating ? "Generating..." : "Generate"}
+                </button>
+              </div>
             </div>
             {/* End relative container */}
           </div>
