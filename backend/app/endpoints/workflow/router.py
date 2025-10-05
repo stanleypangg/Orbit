@@ -1285,16 +1285,27 @@ async def finalize_workflow(thread_id: str, concept_id: int):
         logger.info("[Phase 4] Starting detailed content generation for thread %s", thread_id)
         
         # Call the full package creation (includes AI for ESG metrics and tools)
-        full_package = await create_final_package(
-            state_dict,
-            selected_concept,
-            selection
-        )
-        
-        # Store FULL package (overwrite essential)
-        redis_service.set(package_key, json.dumps(full_package), ex=3600)
-        logger.info("[Phase 4] Full package with detailed ESG/tools stored for thread %s", thread_id)
-        
+        full_package = essential_package  # Default to essential if full generation fails
+        try:
+            full_package = await create_final_package(
+                state_dict,
+                selected_concept,
+                selection
+            )
+            
+            logger.info(f"[Phase 4] Full package created, checking ESG: {'detailed_esg_metrics' in full_package}")
+            if 'detailed_esg_metrics' in full_package and full_package['detailed_esg_metrics']:
+                logger.info(f"[Phase 4] ESG score: {full_package['detailed_esg_metrics'].get('overall_esg_score', 'MISSING')}")
+            else:
+                logger.error("[Phase 4] ⚠️ Full package missing or None detailed_esg_metrics!")
+            
+            # Store FULL package (overwrite essential)
+            redis_service.set(package_key, json.dumps(full_package), ex=3600)
+            logger.info("[Phase 4] Full package with detailed ESG/tools stored for thread %s", thread_id)
+        except Exception as pkg_error:
+            logger.error(f"[Phase 4] ❌ create_final_package failed: {pkg_error}", exc_info=True)
+            # Essential package will remain as fallback (already stored above)
+            
         # Store project package for compatibility
         redis_service.set(f"project_package:{thread_id}", json.dumps(full_package), ex=3600)
 
