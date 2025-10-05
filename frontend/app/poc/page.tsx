@@ -226,12 +226,28 @@ export default function Home() {
     // Only auto-scroll after the initial animation is complete (phase 8+)
     // and if user hasn't manually scrolled up
     if (animationPhase >= 8 && !userHasScrolled) {
-      // Small delay to ensure DOM has updated
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
+      // Use requestAnimationFrame to ensure DOM has fully updated
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollToBottom();
+        }, 50);
+      });
     }
   }, [messages, animationPhase, userHasScrolled]);
+
+  // Force scroll to bottom when new messages arrive (even if user scrolled)
+  // This ensures immediate visibility of new chat bubbles
+  useEffect(() => {
+    if (animationPhase >= 8 && messages.length > 0) {
+      // Always scroll on new messages, but respect userHasScrolled for subsequent updates
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && !userHasScrolled) {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }
+    }
+  }, [messages.length, animationPhase]);
 
   // Prevent body scroll during chat mode transition animation
   useEffect(() => {
