@@ -112,14 +112,27 @@ export default function ProductDetail() {
 
         if (!response.ok) {
           if (response.status === 404) {
-            console.log("[Product Page] Package not ready yet (404), using fallback");
-            return; // Package not generated yet, use fallback
+            console.log("[Product Page] Package not ready yet (404), will retry in 3s");
+            // Retry after 3 seconds - Phase 4 might still be running
+            setTimeout(fetchPackageData, 3000);
+            return;
           }
           throw new Error(`Failed to fetch package data: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         console.log("[Product Page] ✓ Loaded package data:", data);
+        console.log("[Product Page] ESG Metrics:", data.detailed_esg_metrics);
+        console.log("[Product Page] Overall ESG Score:", data.detailed_esg_metrics?.overall_esg_score);
+        
+        // Check if this is essential package (no ESG yet) or full package
+        if (!data.detailed_esg_metrics) {
+          console.log("[Product Page] Essential package received, waiting for full package...");
+          // Retry after 5 seconds to get full package with ESG
+          setTimeout(fetchPackageData, 5000);
+          return;
+        }
+        
         setPackageData(data);
       } catch (err) {
         console.error("[Product Page] Error loading package data:", err);
@@ -158,33 +171,33 @@ export default function ProductDetail() {
         if (wasQueued) {
           console.log("[Product Page] Trellis generation already queued, polling for status...");
           
-          const pollStatus = async () => {
-            try {
-              const statusResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/status/${threadId}`
-              );
+        const pollStatus = async () => {
+          try {
+            const statusResponse = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/status/${threadId}`
+            );
+            
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
               
-              if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
-                
-                if (statusData.status === "complete" && statusData.model_file) {
-                  console.log("[Product Page] ✓ Background generation complete!");
-                  const modelUrlWithCacheBust = `${statusData.model_file}?_cb=${Date.now()}`;
-                  setModelUrl(modelUrlWithCacheBust);
-                  localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
-                  setIsGenerating(false);
-                  return true; // Stop polling
-                } else if (statusData.status === "error") {
-                  console.error("[Product Page] Background generation failed:", statusData.message);
-                  setError(statusData.message);
-                  setIsGenerating(false);
+              if (statusData.status === "complete" && statusData.model_file) {
+                console.log("[Product Page] ✓ Background generation complete!");
+                const modelUrlWithCacheBust = `${statusData.model_file}?_cb=${Date.now()}`;
+                setModelUrl(modelUrlWithCacheBust);
+                localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
+                setIsGenerating(false);
+                return true; // Stop polling
+              } else if (statusData.status === "error") {
+                console.error("[Product Page] Background generation failed:", statusData.message);
+                setError(statusData.message);
+                setIsGenerating(false);
                   // Clear flag so user can retry
                   localStorage.removeItem(trellisKey);
-                  return true; // Stop polling
-                } else {
-                  // Still processing
+                return true; // Stop polling
+              } else {
+                // Still processing
                   console.log(`[Product Page] Background generation: ${statusData.progress || 0}%`);
-                  return false; // Continue polling
+                return false; // Continue polling
                 }
               } else {
                 // Status endpoint not available, clear flag and fall through
@@ -198,23 +211,23 @@ export default function ProductDetail() {
               localStorage.removeItem(trellisKey);
               return true; // Stop polling on error
             }
-          };
-          
-          // Poll every 3 seconds
-          setIsGenerating(true);
-          const checkStatus = async () => {
-            const shouldStop = await pollStatus();
-            if (!shouldStop) {
-              setTimeout(checkStatus, 3000);
-            }
-          };
-          
-          const initialCheck = await pollStatus();
-          if (!initialCheck) {
+        };
+        
+        // Poll every 3 seconds
+        setIsGenerating(true);
+        const checkStatus = async () => {
+          const shouldStop = await pollStatus();
+          if (!shouldStop) {
             setTimeout(checkStatus, 3000);
-            return; // Exit and let polling handle it
           }
-          
+        };
+        
+        const initialCheck = await pollStatus();
+        if (!initialCheck) {
+          setTimeout(checkStatus, 3000);
+          return; // Exit and let polling handle it
+        }
+        
           // If polling stopped and no model, fall through to generate now
           if (!modelUrl) {
             console.log("[Product Page] Background job not found, will generate now");
@@ -320,13 +333,27 @@ export default function ProductDetail() {
   const projectSummary = packageData?.executive_summary?.tagline || packageData?.executive_summary?.description || "Earring crafted entirely from recycled ocean plastic";
   
   const esgMetrics = packageData?.detailed_esg_metrics;
-  const overallScore = esgMetrics?.overall_esg_score || 97;
-  const carbonScore = esgMetrics?.carbon_impact ? Math.round((esgMetrics.carbon_impact.emissions_reduction_score + esgMetrics.carbon_impact.energy_efficiency_score + esgMetrics.carbon_impact.transport_impact_score) / 3) : 98;
-  const waterScore = esgMetrics?.water_conservation ? Math.round((esgMetrics.water_conservation.usage_reduction_score + esgMetrics.water_conservation.pollution_prevention_score + esgMetrics.water_conservation.treatment_efficiency_score) / 3) : 99;
-  const circularScore = esgMetrics?.material_circularity?.circularity_percentage || 96;
+  const hasRealESGData = !!(esgMetrics?.overall_esg_score);
   
-  const co2Avoided = esgMetrics?.carbon_impact?.total_co2_avoided_kg || 0.05;
-  const waterSaved = esgMetrics?.water_conservation?.total_water_saved_liters || 0.04;
+  // Log whether we're using real or fallback data
+  console.log("[Product Page] Using real ESG data:", hasRealESGData);
+  if (hasRealESGData) {
+    console.log("[Product Page] Real ESG scores:", {
+      overall: esgMetrics?.overall_esg_score,
+      carbon: esgMetrics?.carbon_impact?.emissions_reduction_score,
+      water: esgMetrics?.water_conservation?.usage_reduction_score,
+      circular: esgMetrics?.material_circularity?.circularity_percentage
+    });
+  }
+  
+  // Only use real data - no fallbacks
+  const overallScore = esgMetrics?.overall_esg_score;
+  const carbonScore = esgMetrics?.carbon_impact ? Math.round((esgMetrics.carbon_impact.emissions_reduction_score + esgMetrics.carbon_impact.energy_efficiency_score + esgMetrics.carbon_impact.transport_impact_score) / 3) : undefined;
+  const waterScore = esgMetrics?.water_conservation ? Math.round((esgMetrics.water_conservation.usage_reduction_score + esgMetrics.water_conservation.pollution_prevention_score + esgMetrics.water_conservation.treatment_efficiency_score) / 3) : undefined;
+  const circularScore = esgMetrics?.material_circularity?.circularity_percentage;
+  
+  const co2Avoided = esgMetrics?.carbon_impact?.total_co2_avoided_kg;
+  const waterSaved = esgMetrics?.water_conservation?.total_water_saved_liters;
   
   // Combine tools and materials, ensuring all have icon_name
   const toolsAndMaterials: ToolOrMaterial[] = [
@@ -389,14 +416,12 @@ export default function ProductDetail() {
 
         {/* Top Section: Model Viewer + ESG Impact Split */}
         <div className="grid grid-cols-[7fr_5fr] gap-6 mb-8">
-          {/* 3D Model Viewer - Square */}
-          <div className="aspect-square">
+          {/* 3D Model Viewer */}
           <ModelViewer
             modelUrl={modelUrl}
             isLoading={isGenerating}
             error={error}
           />
-          </div>
           
           {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
@@ -421,13 +446,25 @@ export default function ProductDetail() {
                 
                 {/* Overall Score */}
                 <div className="text-center mb-6">
+                  {overallScore !== undefined ? (
+                    <>
                   <div className="flex items-baseline justify-center gap-1 mb-2">
-                    <span className="text-5xl font-bold text-[#67B68B] font-mono">{overallScore}</span>
+                        <span className="text-5xl font-bold text-[#67B68B] font-mono">{overallScore}</span>
                     <span className="text-xl text-gray-500 font-mono">/100</span>
                   </div>
                   <div className="px-3 py-1 bg-[#67B68B]/10 border border-[#67B68B]/30 rounded text-[#67B68B] font-mono text-xs inline-block">
-                    S-RANK
+                        {overallScore >= 95 ? "S-RANK" : overallScore >= 85 ? "A-RANK" : overallScore >= 75 ? "B-RANK" : "C-RANK"}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="animate-pulse">
+                      <div className="flex items-baseline justify-center gap-1 mb-2">
+                        <div className="h-12 w-24 bg-[#67B68B]/20"></div>
+                        <div className="h-6 w-12 bg-gray-700"></div>
+                      </div>
+                      <div className="h-6 w-20 bg-[#67B68B]/20 mx-auto"></div>
                   </div>
+                  )}
                 </div>
                 
                 {/* Radar Chart */}
@@ -471,19 +508,31 @@ export default function ProductDetail() {
                   {/* Labels */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6">
                     <div className="text-xs text-[#67B68B] font-mono text-center">
-                      <div className="font-bold">{carbonScore}</div>
+                      {carbonScore !== undefined ? (
+                        <div className="font-bold">{carbonScore}</div>
+                      ) : (
+                        <div className="h-4 w-8 bg-[#67B68B]/20 animate-pulse mx-auto"></div>
+                      )}
                       <div className="text-[10px] text-gray-400">CARBON</div>
                     </div>
                   </div>
                   <div className="absolute bottom-0 right-0 translate-x-4 translate-y-6">
                     <div className="text-xs text-[#5BA3D0] font-mono text-center">
-                      <div className="font-bold">{waterScore}</div>
+                      {waterScore !== undefined ? (
+                        <div className="font-bold">{waterScore}</div>
+                      ) : (
+                        <div className="h-4 w-8 bg-[#5BA3D0]/20 animate-pulse mx-auto"></div>
+                      )}
                       <div className="text-[10px] text-gray-400">WATER</div>
                     </div>
                   </div>
                   <div className="absolute bottom-0 left-0 -translate-x-4 translate-y-6">
                     <div className="text-xs text-[#4ade80] font-mono text-center">
-                      <div className="font-bold">{circularScore}</div>
+                      {circularScore !== undefined ? (
+                        <div className="font-bold">{circularScore}</div>
+                      ) : (
+                        <div className="h-4 w-8 bg-[#4ade80]/20 animate-pulse mx-auto"></div>
+                      )}
                       <div className="text-[10px] text-gray-400">CIRCULAR</div>
                     </div>
                   </div>
@@ -507,42 +556,74 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#67B68B] flex items-center justify-center text-[#67B68B] text-[10px] font-mono">&gt;</div>
                       <span className="text-[10px] text-[#67B68B] font-mono uppercase">Carbon</span>
                     </div>
-                    <div className="text-xl font-bold text-[#67B68B] font-mono">{carbonScore}</div>
+                    {carbonScore !== undefined ? (
+                      <div className="text-xl font-bold text-[#67B68B] font-mono">{carbonScore}</div>
+                    ) : (
+                      <div className="h-6 w-12 bg-[#67B68B]/20 animate-pulse"></div>
+                    )}
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>EMISSIONS</span>
-                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.emissions_reduction_score || 98}</span>
+                        {esgMetrics?.carbon_impact?.emissions_reduction_score !== undefined ? (
+                          <span className="text-[#67B68B]">{esgMetrics.carbon_impact.emissions_reduction_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#67B68B]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.emissions_reduction_score || 98}%` }} />
+                        {esgMetrics?.carbon_impact?.emissions_reduction_score !== undefined ? (
+                          <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics.carbon_impact.emissions_reduction_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#67B68B]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>ENERGY</span>
-                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.energy_efficiency_score || 95}</span>
+                        {esgMetrics?.carbon_impact?.energy_efficiency_score !== undefined ? (
+                          <span className="text-[#67B68B]">{esgMetrics.carbon_impact.energy_efficiency_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#67B68B]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.energy_efficiency_score || 95}%` }} />
+                        {esgMetrics?.carbon_impact?.energy_efficiency_score !== undefined ? (
+                          <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics.carbon_impact.energy_efficiency_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#67B68B]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>TRANSPORT</span>
-                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.transport_impact_score || 100}</span>
+                        {esgMetrics?.carbon_impact?.transport_impact_score !== undefined ? (
+                          <span className="text-[#67B68B]">{esgMetrics.carbon_impact.transport_impact_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#67B68B]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.transport_impact_score || 100}%` }} />
+                        {esgMetrics?.carbon_impact?.transport_impact_score !== undefined ? (
+                          <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics.carbon_impact.transport_impact_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#67B68B]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                   </div>
                   
                   <div className="mt-3 pt-3 border-t border-[#67B68B]/20">
                     <div className="text-[8px] text-gray-500 font-mono">
-                      <span className="text-[#67B68B]">{co2Avoided.toFixed(2)} kg</span> saved
+                      {co2Avoided !== undefined ? (
+                        <><span className="text-[#67B68B]">{co2Avoided.toFixed(2)} kg</span> saved</>
+                      ) : (
+                        <div className="h-2 w-16 bg-[#67B68B]/20 animate-pulse"></div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -562,42 +643,74 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#5BA3D0] flex items-center justify-center text-[#5BA3D0] text-[10px] font-mono">~</div>
                       <span className="text-[10px] text-[#5BA3D0] font-mono uppercase">Water</span>
                     </div>
-                    <div className="text-xl font-bold text-[#5BA3D0] font-mono">{waterScore}</div>
+                    {waterScore !== undefined ? (
+                      <div className="text-xl font-bold text-[#5BA3D0] font-mono">{waterScore}</div>
+                    ) : (
+                      <div className="h-6 w-12 bg-[#5BA3D0]/20 animate-pulse"></div>
+                    )}
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>USAGE</span>
-                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.usage_reduction_score || 99}</span>
+                        {esgMetrics?.water_conservation?.usage_reduction_score !== undefined ? (
+                          <span className="text-[#5BA3D0]">{esgMetrics.water_conservation.usage_reduction_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#5BA3D0]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.usage_reduction_score || 99}%` }} />
+                        {esgMetrics?.water_conservation?.usage_reduction_score !== undefined ? (
+                          <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics.water_conservation.usage_reduction_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#5BA3D0]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>POLLUTION</span>
-                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.pollution_prevention_score || 100}</span>
+                        {esgMetrics?.water_conservation?.pollution_prevention_score !== undefined ? (
+                          <span className="text-[#5BA3D0]">{esgMetrics.water_conservation.pollution_prevention_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#5BA3D0]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.pollution_prevention_score || 100}%` }} />
+                        {esgMetrics?.water_conservation?.pollution_prevention_score !== undefined ? (
+                          <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics.water_conservation.pollution_prevention_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#5BA3D0]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>TREATMENT</span>
-                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.treatment_efficiency_score || 98}</span>
+                        {esgMetrics?.water_conservation?.treatment_efficiency_score !== undefined ? (
+                          <span className="text-[#5BA3D0]">{esgMetrics.water_conservation.treatment_efficiency_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#5BA3D0]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.treatment_efficiency_score || 98}%` }} />
+                        {esgMetrics?.water_conservation?.treatment_efficiency_score !== undefined ? (
+                          <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics.water_conservation.treatment_efficiency_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#5BA3D0]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                   </div>
                   
                   <div className="mt-3 pt-3 border-t border-[#5BA3D0]/20">
                     <div className="text-[8px] text-gray-500 font-mono">
-                      <span className="text-[#5BA3D0]">{waterSaved.toFixed(2)} L</span> conserved
+                      {waterSaved !== undefined ? (
+                        <><span className="text-[#5BA3D0]">{waterSaved.toFixed(2)} L</span> conserved</>
+                      ) : (
+                        <div className="h-2 w-16 bg-[#5BA3D0]/20 animate-pulse"></div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -617,35 +730,63 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#4ade80] flex items-center justify-center text-[#4ade80] text-[10px] font-mono">↻</div>
                       <span className="text-[10px] text-[#4ade80] font-mono uppercase">Circular</span>
                     </div>
-                    <div className="text-xl font-bold text-[#4ade80] font-mono">{circularScore}</div>
+                    {circularScore !== undefined ? (
+                      <div className="text-xl font-bold text-[#4ade80] font-mono">{circularScore}</div>
+                    ) : (
+                      <div className="h-6 w-12 bg-[#4ade80]/20 animate-pulse"></div>
+                    )}
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>REUSE</span>
-                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.reuse_score || 100}</span>
+                        {esgMetrics?.material_circularity?.reuse_score !== undefined ? (
+                          <span className="text-[#4ade80]">{esgMetrics.material_circularity.reuse_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#4ade80]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.reuse_score || 100}%` }} />
+                        {esgMetrics?.material_circularity?.reuse_score !== undefined ? (
+                          <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics.material_circularity.reuse_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#4ade80]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>LONGEVITY</span>
-                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.longevity_score || 95}</span>
+                        {esgMetrics?.material_circularity?.longevity_score !== undefined ? (
+                          <span className="text-[#4ade80]">{esgMetrics.material_circularity.longevity_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#4ade80]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.longevity_score || 95}%` }} />
+                        {esgMetrics?.material_circularity?.longevity_score !== undefined ? (
+                          <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics.material_circularity.longevity_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#4ade80]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>END-OF-LIFE</span>
-                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.end_of_life_score || 93}</span>
+                        {esgMetrics?.material_circularity?.end_of_life_score !== undefined ? (
+                          <span className="text-[#4ade80]">{esgMetrics.material_circularity.end_of_life_score}</span>
+                        ) : (
+                          <div className="h-2 w-6 bg-[#4ade80]/20 animate-pulse"></div>
+                        )}
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.end_of_life_score || 93}%` }} />
+                        {esgMetrics?.material_circularity?.end_of_life_score !== undefined ? (
+                          <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics.material_circularity.end_of_life_score}%` }} />
+                        ) : (
+                          <div className="h-full bg-[#4ade80]/20 animate-pulse w-full"></div>
+                        )}
                       </div>
                     </div>
         </div>

@@ -233,12 +233,29 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
 
     # Validate that we have ingredient data
     if not state.ingredients_data or not state.ingredients_data.ingredients:
-        logger.error("G1: No ingredient data available for goal formation")
-        message = "No ingredient data available for goal formation"
-        state.errors.append(message)
+        logger.warning("G1: No ingredients extracted, prompting user to describe what they want to make")
         
-        # STOP THE LOOP: This is a fatal error, we cannot proceed
-        raise Exception("Fatal: No ingredients available - extraction may have failed")
+        # Instead of erroring, ask the user what they want to make
+        clarification_question = "I couldn't identify any specific materials from your input. Could you tell me what you'd like to make? For example: 'a lamp from glass bottles' or 'jewelry from plastic caps'"
+        
+        # Save question to Redis for frontend
+        from app.core.redis import redis_service
+        question_key = f"clarification:{state.thread_id}"
+        redis_service.set(question_key, clarification_question, ex=3600)
+        
+        # Add question to state and mark as needing input
+        state.add_user_question(clarification_question)
+        
+        # Return with needs_user_input flag - workflow will pause here
+        logger.info("G1: Pausing workflow to request user clarification")
+        return {
+            "needs_user_input": True,
+            "user_questions": [clarification_question],
+            "current_node": "G1_goal_formation",
+            "current_phase": "goal_formation",
+            "goals": None,  # No goals yet - waiting for ingredient info
+            "artifact_type": None
+        }
 
     # Build goal formation prompt
     ingredients_summary = []
@@ -763,19 +780,21 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
 # Routing functions for LangGraph
 def should_proceed_to_choices(state: WorkflowState) -> str:
     """Determine if goal formation is complete."""
-    # Check for fatal errors that should stop the workflow
-    if state.errors and len(state.errors) > 3:
+    # Check for fatal errors that should stop the workflow (but not ingredient clarification)
+    if state.errors and len(state.errors) > 5:
         logger.error(f"Too many errors ({len(state.errors)}), cannot proceed")
         raise Exception(f"Workflow failed: {state.errors[-1]}")
+    
+    # If we need user input, DON'T loop - let the workflow pause
+    # The orchestrator will check needs_user_input and return "waiting_for_input"
+    if state.needs_user_input:
+        logger.info("G1: Workflow paused for user input, not looping")
+        return "choice_generation"  # This will be caught by orchestrator before reaching O1
     
     if state.goals and state.artifact_type:
         return "choice_generation"
     
-    # If no goals but errors exist, try one more time max
-    if state.errors and "No ingredient data" in str(state.errors):
-        logger.error("Fatal error: No ingredients available, stopping workflow")
-        raise Exception("Cannot proceed without ingredient data")
-    
+    # Default: try goal formation again (but this should rarely happen now)
     return "goal_formation"
 
 
