@@ -64,7 +64,7 @@ export default function ToolsAndMaterialsSection({
         {canGoPrevious && (
           <button
             onClick={handlePrevious}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center transition-colors"
+            className="absolute top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center transition-colors"
             aria-label="Previous items"
           >
             <span className="text-[#67B68B] text-xl">‹</span>
@@ -74,25 +74,34 @@ export default function ToolsAndMaterialsSection({
         {/* Items Container */}
         <div
           ref={containerRef}
-          className="overflow-hidden px-12\"
+          className="overflow-hidden px-12"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div
-            className="flex gap-6"
+            className="flex gap-6 justify-between"
             style={{
-              width: `${(items.length / itemsPerPage) * 100}%`,
+              width:
+                items.length <= itemsPerPage
+                  ? "100%"
+                  : `${(items.length / itemsPerPage) * 100}%`,
             }}
           >
             {items.map((item, index) => {
               const toolImage = getToolImage(item.name, item.category);
-              
+
               return (
                 <div
                   key={index}
-                  className="flex flex-col items-center"
+                  className="flex flex-col items-center flex-shrink-0"
                   style={{
-                    minWidth: `${100 / items.length}%`,
-                    flex: `0 0 ${100 / items.length}%`,
+                    width:
+                      items.length <= itemsPerPage
+                        ? `calc((100% - ${
+                            (itemsPerPage - 1) * 24
+                          }px) / ${Math.min(items.length, itemsPerPage)})`
+                        : `calc((100% - ${
+                            (itemsPerPage - 1) * 24
+                          }px) / ${itemsPerPage})`,
                   }}
                 >
                   {/* Square card */}
@@ -117,7 +126,7 @@ export default function ToolsAndMaterialsSection({
                         />
                       ) : (
                         // Otherwise use emoji with styled background
-                        <div 
+                        <div
                           className="text-6xl relative"
                           style={{
                             filter: `drop-shadow(0 0 12px ${toolImage.color}60)`,
@@ -184,9 +193,7 @@ export default function ToolsAndMaterialsSection({
           <div className="w-3 h-3 bg-[#5BA3D0]/20 border-[0.5px] border-[#5BA3D0]/50" />
           <span className="text-gray-400">MATERIAL</span>
         </div>
-        <div className="ml-auto text-gray-500">
-          → Visual representations
-        </div>
+        <div className="ml-auto text-gray-500">→ Visual representations</div>
       </div>
     </div>
   );
