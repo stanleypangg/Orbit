@@ -296,10 +296,10 @@ export default function MagicPencilPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#161924] flex flex-col font-menlo">
+    <div className="h-screen bg-[#161924] flex flex-col font-menlo overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="w-full max-w-6xl">
+      <div className="flex-1 flex flex-col items-center pt-8">
+        <div className="w-full max-w-6xl px-8">
           {/* Title */}
           <h1 className="text-4xl font-light tracking-wider text-white mb-2">
             Adjust your Design
@@ -437,7 +437,16 @@ export default function MagicPencilPage() {
                 >
                   {isGenerating ? "Generating..." : "Generate"}
                 </button>
-                <button className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide">
+                <button
+                  onClick={() => {
+                    // Store image in localStorage to pass to product page
+                    if (uploadedImage) {
+                      localStorage.setItem("productImage", uploadedImage);
+                    }
+                    window.location.href = "/product";
+                  }}
+                  className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
+                >
                   Continue
                 </button>
               </div>
