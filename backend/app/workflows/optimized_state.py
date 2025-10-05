@@ -171,7 +171,7 @@ class GeminiModelConfig(BaseModel):
     def for_evaluation(cls) -> "GeminiModelConfig":
         """Configuration for concept evaluation (accuracy-optimized)."""
         return cls(
-            model_name="gemini-2.5-pro",
+            model_name="gemini-2.5-flash",
             temperature=0.3,
             max_tokens=1024,
             use_structured_output=True

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = Field(default=os.getenv("GEMINI_API_KEY", None))
     
     # Gemini settings
-    GEMINI_MODEL: str = Field(default=os.getenv("GEMINI_MODEL", "gemini-2.5-pro"))
+    GEMINI_MODEL: str = Field(default=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
     GEMINI_FLASH_MODEL: str = Field(default=os.getenv("GEMINI_FLASH_MODEL", "gemini-2.5-flash"))
     GEMINI_MAX_RETRIES: int = Field(default=int(os.getenv("GEMINI_MAX_RETRIES", "3")))
     GEMINI_TEMPERATURE: float = Field(default=float(os.getenv("GEMINI_TEMPERATURE", "0.7")))

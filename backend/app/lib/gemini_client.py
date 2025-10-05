@@ -44,7 +44,7 @@ class GeminiClient:
     
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model or os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+        self.model_name = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required")
@@ -71,7 +71,7 @@ class GeminiClient:
 
     def use_flash_model(self) -> 'GeminiClient':
         """Switch to faster Flash model for simple operations."""
-        self.model_name = "gemini-1.5-flash"
+        self.model_name = "gemini-2.5-flash"
         logger.info(f"Switched to Flash model: {self.model_name}")
         return self
 

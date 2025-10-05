@@ -54,7 +54,7 @@ class ProductionGeminiClient:
         # Model configuration
         self.pro_model = settings.GEMINI_MODEL
         self.flash_model = settings.GEMINI_FLASH_MODEL
-        self.current_model = self.pro_model
+        self.current_model = self.flash_model
 
         # No safety settings - disabled for unrestricted operation
         self.safety_settings = {

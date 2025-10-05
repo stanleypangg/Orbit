@@ -4,6 +4,7 @@ import { Chat } from "@/components/Chat";
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PresetCard from "@/components/PresetCard";
 import { useWorkflow } from "@/lib/workflow/useWorkflow";
 import { Idea, Ingredient } from "@/lib/chat/types";
@@ -66,8 +67,13 @@ export default function Home() {
     setPageLoaded(true);
   }, []);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const threadIdFromUrl = searchParams.get('thread');
+  
   const { state: workflowState, startWorkflow, resumeWorkflow, selectOption, selectConcept } = useWorkflow({
     apiUrl: 'http://localhost:8000',
+    initialThreadId: threadIdFromUrl || undefined, // Resume from URL if present
   });
 
   const presets = [
