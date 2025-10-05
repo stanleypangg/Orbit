@@ -300,7 +300,26 @@ export default function Home() {
   };
 
   const handleConceptSelect = async (conceptId: string) => {
-    await selectConcept(conceptId);
+    // Find the selected concept
+    const selectedConcept = workflowState.concepts.find(c => c.concept_id === conceptId);
+    
+    if (!selectedConcept) {
+      console.error('Selected concept not found');
+      return;
+    }
+    
+    // Trigger Phase 4 packaging in background (don't await)
+    selectConcept(conceptId); // No await - runs in background
+    
+    // Immediately navigate to Magic Pencil with the hero image
+    const params = new URLSearchParams({
+      imageUrl: selectedConcept.image_url,
+      title: selectedConcept.title,
+      threadId: workflowState.threadId || '',
+      conceptId: conceptId
+    });
+    
+    window.location.href = `/poc/magic-pencil?${params.toString()}`;
   };
 
   // Handle workflow concept selection - Add concepts to messages

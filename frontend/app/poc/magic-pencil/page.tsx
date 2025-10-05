@@ -16,10 +16,14 @@ interface HistoryState {
 
 export default function MagicPencilPage() {
   const searchParams = useSearchParams();
-  const imageFromQuery = searchParams.get("image") || "/pikachu.webp";
-  const [uploadedImage, setUploadedImage] = useState<string | null>(
-    imageFromQuery
-  );
+  
+  // Get hero image from workflow or fallback to demo image
+  const imageUrl = searchParams.get("imageUrl") || searchParams.get("image") || "/pikachu.webp";
+  const projectTitle = searchParams.get("title") || "Your Project";
+  const threadId = searchParams.get("threadId");
+  const conceptId = searchParams.get("conceptId");
+  
+  const [uploadedImage, setUploadedImage] = useState<string | null>(imageUrl);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<"pencil" | "eraser" | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -57,6 +61,7 @@ export default function MagicPencilPage() {
       if (!ctx) return;
 
       const img = new window.Image();
+      img.crossOrigin = "anonymous"; // Enable CORS for external images
       img.src = uploadedImage;
       img.onload = () => {
         canvas.width = img.width;
@@ -69,6 +74,10 @@ export default function MagicPencilPage() {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         setHistory([{ imageData, baseImage: uploadedImage }]);
         setHistoryIndex(0);
+      };
+      
+      img.onerror = () => {
+        console.error('Failed to load image:', uploadedImage);
       };
     }
   }, [uploadedImage]);
@@ -338,12 +347,37 @@ export default function MagicPencilPage() {
 
   return (
     <div className="h-screen bg-[#161924] flex flex-col font-menlo overflow-hidden">
+      {/* Header */}
+      <header className="w-full bg-[#161924] pt-6 pb-4 px-10 border-b border-[#2A3142] flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Image
+            src="/logo_text.svg"
+            alt="Orbit"
+            width={80}
+            height={27}
+            className="opacity-90"
+          />
+          {projectTitle && threadId && (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <span className="text-[#4ade80]">✓</span>
+              <span>{projectTitle}</span>
+            </div>
+          )}
+        </div>
+        <a 
+          href="/poc" 
+          className="text-gray-400 hover:text-white text-sm transition-colors"
+        >
+          ← Back to Workflow
+        </a>
+      </header>
+      
       {/* Main Content */}
       <div className="flex-1 flex flex-col pt-8 max-w-7xl mx-auto w-full">
         <div className="w-full max-w-full">
           {/* Title */}
           <h1 className="text-4xl font-light tracking-wider text-white mb-2">
-            Adjust your Design
+            {projectTitle && threadId ? `Edit ${projectTitle}` : 'Adjust your Design'}
           </h1>
           <p className="text-[#67B68B] text-xl tracking-wider mb-12">
             Make changes before finalizing

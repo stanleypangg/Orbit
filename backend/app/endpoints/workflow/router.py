@@ -165,13 +165,33 @@ async def stream_workflow(thread_id: str):
                         hero["sent"] = True
                         redis_service.set(hero_key, json.dumps(hero), ex=3600)
                 
-                # Check for concept generation updates (full set)
+                # PROGRESSIVE CONCEPT UPDATES: Stream each concept as it completes (FAST!)
+                # Check for individual concept progress updates
+                concept_progress_pattern = f"concept_progress:{thread_id}:*"
+                progress_keys = redis_service.keys(concept_progress_pattern)
+                
+                if progress_keys:
+                    for progress_key in progress_keys:
+                        progress_data = redis_service.get(progress_key)
+                        if progress_data:
+                            progress = json.loads(progress_data)
+                            if progress.get("status") == "ready" and not progress.get("sent"):
+                                # Stream this single concept update
+                                yield f"data: {json.dumps({'type': 'concept_progress', 'data': progress})}\n\n"
+                                progress["sent"] = True
+                                redis_service.set(progress_key, json.dumps(progress), ex=3600)
+                                logger.info(f"SSE: Streamed concept {progress.get('concept_id')} progress to frontend")
+                
+                # Check for concept generation updates (full set) - sent after all complete
                 concepts_key = f"concepts:{thread_id}"
                 concepts_data = redis_service.get(concepts_key)
 
                 if concepts_data:
                     concepts = json.loads(concepts_data)
-                    yield f"data: {json.dumps({'type': 'concepts_generated', 'data': concepts})}\n\n"
+                    if concepts.get("status") == "complete" and not concepts.get("sent"):
+                        yield f"data: {json.dumps({'type': 'concepts_generated', 'data': concepts})}\n\n"
+                        concepts["sent"] = True
+                        redis_service.set(concepts_key, json.dumps(concepts), ex=3600)
 
                 # Check for Magic Pencil edit updates
                 magic_pencil_pattern = f"magic_pencil:{thread_id}:*"
