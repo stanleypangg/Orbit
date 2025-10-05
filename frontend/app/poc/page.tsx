@@ -421,7 +421,7 @@ export default function Home() {
                   }
                 }}
                 placeholder="Continue the conversation..."
-                className="flex-1 bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-gray-500 rounded"
+                className="flex-1 bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo rounded"
                 rows={2}
               />
               <button
@@ -484,7 +484,7 @@ export default function Home() {
         {/* Title */}
         <div className="overflow-hidden">
           <h1
-            className="text-4xl text-white mb-2 transition-all duration-500 ease-out"
+            className="text-3xl text-white mb-2 transition-all duration-500 ease-out"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
@@ -493,6 +493,9 @@ export default function Home() {
           >
             Turn Waste into Products
           </h1>
+          <h2 className="text-[#67B68B] text-base mt-2 mb-4 font-mono">
+            Describe your waste material
+          </h2>
         </div>
 
         {/* Input Section */}
@@ -505,21 +508,7 @@ export default function Home() {
               animationPhase >= 3 ? "translateY(-50px)" : "translateY(0)",
           }}
         >
-          <div className="overflow-hidden">
-            {animationPhase < 2 && (
-              <label
-                className="block text-[#4ade80] text-base mb-4 font-mono transition-all duration-500 ease-out"
-                style={{
-                  transform:
-                    animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
-                  opacity: animationPhase >= 2 ? 0 : 1,
-                }}
-              >
-                Describe your waste material
-              </label>
-            )}
-          </div>
-          <div className="relative">
+          <div className="relative placeholder:text-[#B1AFAF] placeholder:font-menlo placeholder:tracking-widest">
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -537,13 +526,13 @@ export default function Home() {
                 height: animationPhase >= 4 ? "60vh" : "10rem",
                 transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
-              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-gray-500"
+              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-[#B1AFAF]"
             />
           </div>
         </div>
 
         {/* Generate Button */}
-        <div className="overflow-hidden">
+        <div className="overflow-hidden mb-20">
           <div
             className="transition-all duration-500 ease-out"
             style={{
@@ -573,7 +562,7 @@ export default function Home() {
             opacity: animationPhase >= 1 ? 0 : 1,
           }}
         >
-          <h2 className="text-[#4ade80] text-base mb-4 font-mono">
+          <h2 className="text-[#67B68B] text-base mb-4 font-mono">
             Try these examples
           </h2>
           <div className="flex justify-between">
