@@ -30,6 +30,12 @@ export default function Home() {
   const [extractedIngredients, setExtractedIngredients] = useState<
     Ingredient[]
   >([]);
+  const [pageLoaded, setPageLoaded] = useState(false);
+
+  // Fade-in animation on page load
+  useEffect(() => {
+    setPageLoaded(true);
+  }, []);
 
   const presets = [
     {
@@ -57,8 +63,28 @@ export default function Home() {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Only auto-scroll after the initial animation is complete (phase 8+)
+    // This prevents the page from scrolling during the chat mode transition
+    if (animationPhase >= 8) {
+      scrollToBottom();
+    }
+  }, [messages, animationPhase]);
+
+  // Prevent body scroll during chat mode transition animation
+  useEffect(() => {
+    if (isChatMode && animationPhase < 8) {
+      // Lock scroll during animation
+      document.body.style.overflow = "hidden";
+    } else if (isChatMode && animationPhase >= 8) {
+      // Restore scroll after animation completes
+      document.body.style.overflow = "auto";
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [isChatMode, animationPhase]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -104,6 +130,8 @@ export default function Home() {
       setAnimatedMessageIds(new Set([messageId]));
       setIsChatMode(true);
       setAnimationPhase(6);
+      // Scroll to top to prevent any scroll jumping during transition
+      window.scrollTo({ top: 0, behavior: "instant" });
     }, 1900);
 
     setTimeout(() => {
@@ -217,36 +245,30 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-[#161924] flex flex-col overflow-hidden font-menlo">
         {/* Header */}
-        <div className="p-4 bg-[#1E2433] border-b-[0.5px] border-[#2A3142] flex items-center gap-4">
-          <Image
-            src="/logo_text.svg"
-            alt="Orbit"
-            width={80}
-            height={27}
-            className="opacity-90 mr-auto"
-          />
-          <Link
-            href="/poc/trellis"
-            className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-          >
-            Try Trellis 3D Generator →
+        <header
+          className="w-full bg-[#161924] pt-6 pb-4 pl-10 border-b border-[#2A3142] transition-opacity duration-1000"
+          style={{
+            opacity: pageLoaded ? 1 : 0,
+          }}
+        >
+          <Link href="/poc">
+            <Image
+              src="/logo_text.svg"
+              alt="Orbit"
+              width={80}
+              height={27}
+              className="opacity-90 cursor-pointer hover:opacity-100 transition-opacity"
+            />
           </Link>
-          <Link
-            href="/poc/magic-pencil"
-            className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-          >
-            Try Magic Pencil ✨ →
-          </Link>
-          <Link
-            href="/poc/storyboard"
-            className="text-green-400 hover:text-green-300 font-semibold transition-colors"
-          >
-            Try Storyboard Generator 📋 →
-          </Link>
-        </div>
+        </header>
 
         {/* Chat Container */}
-        <div className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8">
+        <div
+          className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8 transition-opacity duration-1000"
+          style={{
+            opacity: pageLoaded ? 1 : 0,
+          }}
+        >
           {/* Messages Area - This is the grown textarea transformed */}
           <div
             className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto"
@@ -405,12 +427,12 @@ export default function Home() {
             className="mt-4 transition-all duration-500 ease-out"
             style={{
               transform:
-                animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
+                animationPhase >= 7 ? "translateY(0)" : "translateY(200px)",
               opacity: animationPhase >= 7 ? 1 : 0,
               pointerEvents: animationPhase >= 7 ? "auto" : "none",
             }}
           >
-            <div className="flex gap-3 items-end">
+            <div className="relative">
               <textarea
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
@@ -421,15 +443,23 @@ export default function Home() {
                   }
                 }}
                 placeholder="Continue the conversation..."
-                className="flex-1 bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo rounded"
+                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo rounded"
                 rows={2}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!chatInput.trim()}
-                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase rounded"
+                className="absolute right-3 bottom-3 p-2 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
+                aria-label="Send message"
               >
-                Send
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-5 h-5 text-black"
+                >
+                  <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                </svg>
               </button>
             </div>
           </div>
@@ -442,35 +472,23 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#161924] overflow-hidden font-menlo">
       {/* Header */}
-      <div className="p-4 bg-[#1E2433] border-b-[0.5px] border-[#2A3142] flex items-center gap-4">
-        <Image
-          src="/logo_text.svg"
-          alt="Orbit"
-          width={80}
-          height={27}
-          className="opacity-90 mr-auto"
-        />
-        <Link
-          href="/poc/trellis"
-          className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-        >
-          Try Trellis 3D Generator →
+      <header
+        className="w-full bg-[#161924] pt-6 pb-4 pl-10 border-b border-[#2A3142] transition-opacity duration-1000"
+        style={{
+          opacity: pageLoaded ? 1 : 0,
+        }}
+      >
+        <Link href="/poc">
+          <Image
+            src="/logo_text.svg"
+            alt="Orbit"
+            width={80}
+            height={27}
+            className="opacity-90 cursor-pointer hover:opacity-100 transition-opacity"
+          />
         </Link>
-        <Link
-          href="/poc/magic-pencil"
-          className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-        >
-          Try Magic Pencil ✨ →
-        </Link>
-        <Link
-          href="/poc/storyboard"
-          className="text-green-400 hover:text-green-300 font-semibold transition-colors"
-        >
-          Try Storyboard Generator 📋 →
-        </Link>
-      </div>
+      </header>
 
-      {/* Main Content */}
       <div
         className="mx-auto transition-all duration-500 ease-out"
         style={{
@@ -479,6 +497,8 @@ export default function Home() {
           paddingRight: animationPhase >= 3 ? "4rem" : "4rem",
           paddingTop: animationPhase >= 3 ? "2rem" : "4rem",
           paddingBottom: animationPhase >= 3 ? "0" : "0",
+          opacity: pageLoaded ? 1 : 0,
+          transition: "all 1000ms ease-out",
         }}
       >
         {/* Title */}
@@ -559,7 +579,11 @@ export default function Home() {
           style={{
             transform:
               animationPhase >= 1 ? "translateY(100%)" : "translateY(0)",
-            opacity: animationPhase >= 1 ? 0 : 1,
+            opacity: animationPhase >= 1 ? 0 : pageLoaded ? 1 : 0,
+            transition:
+              pageLoaded && animationPhase === 0
+                ? "opacity 1000ms ease-out"
+                : "all 500ms ease-out",
           }}
         >
           <h2 className="text-[#67B68B] text-base mb-4 font-mono">

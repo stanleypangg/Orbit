@@ -15,7 +15,7 @@ router = APIRouter(prefix="/magic-pencil", tags=["magic-pencil"])
 
 class MagicPencilRequest(BaseModel):
     original_image_url: str  # Reference image - this is what AI should preserve
-    drawn_overlay_url: str   # Image with red drawing showing edit areas
+    drawn_overlay_url: str   # Image with green drawing showing edit areas
     prompt: str              # User's natural language edit request
 
 
@@ -31,7 +31,7 @@ async def edit_image(request: MagicPencilRequest):
     
     Workflow:
     1. Original image (reference - what AI should preserve)
-    2. Drawn overlay (shows where user drew in red)
+    2. Drawn overlay (shows where user drew in green)
     3. Pure mask (generated from drawn overlay - isolates edit areas)
     4. User prompt (natural language edit description)
     
@@ -40,15 +40,23 @@ async def edit_image(request: MagicPencilRequest):
     try:
         logger.info(f"Processing Magic Pencil request")
         logger.info(f"Prompt: {request.prompt}")
-        logger.info(f"Original URL: {request.original_image_url}")
-        logger.info(f"Drawn overlay URL: {request.drawn_overlay_url}")
+        logger.info(f"Original URL type: {'data URL' if request.original_image_url.startswith('data:') else 'HTTP URL'}")
+        logger.info(f"Drawn overlay URL type: {'data URL' if request.drawn_overlay_url.startswith('data:') else 'HTTP URL'}")
         
-        # Step 1: Download images
-        original_response = requests.get(request.original_image_url, timeout=10)
-        drawn_response = requests.get(request.drawn_overlay_url, timeout=10)
-         
-        original_image = Image.open(io.BytesIO(original_response.content)).convert("RGBA")
-        drawn_overlay = Image.open(io.BytesIO(drawn_response.content)).convert("RGBA")
+        # Step 1: Load images (handle both data URLs and HTTP URLs)
+        def load_image_from_url(url: str) -> Image.Image:
+            if url.startswith('data:'):
+                # Handle data URL (base64)
+                header, encoded = url.split(',', 1)
+                image_data = base64.b64decode(encoded)
+                return Image.open(io.BytesIO(image_data)).convert("RGBA")
+            else:
+                # Handle HTTP URL
+                response = requests.get(url, timeout=10)
+                return Image.open(io.BytesIO(response.content)).convert("RGBA")
+        
+        original_image = load_image_from_url(request.original_image_url)
+        drawn_overlay = load_image_from_url(request.drawn_overlay_url)
         
         # Resize drawn overlay to match original if needed
         if drawn_overlay.size != original_image.size:
@@ -57,7 +65,7 @@ async def edit_image(request: MagicPencilRequest):
         logger.info(f"Image dimensions: {original_image.size}")
         
         # Step 2: Generate pure mask from drawn overlay
-        # Extract red channel and create binary mask
+        # Extract green channel and create binary mask (frontend draws in green)
         pure_mask = Image.new("L", drawn_overlay.size, 0)  # Black background
         drawn_pixels = drawn_overlay.load()
         mask_pixels = pure_mask.load()
@@ -65,8 +73,9 @@ async def edit_image(request: MagicPencilRequest):
         for y in range(drawn_overlay.size[1]):
             for x in range(drawn_overlay.size[0]):
                 r, g, b, a = drawn_pixels[x, y]
-                # If there's any red marking (r > threshold and a > 0)
-                if r > 100 and a > 50:
+                # If there's any green marking (g > threshold and a > 0)
+                # Frontend uses rgba(76, 222, 128, 0.5) for drawing
+                if g > 100 and a > 50:
                     mask_pixels[x, y] = 255  # White in mask = edit area
         
         logger.info("Generated pure mask from drawn overlay")
