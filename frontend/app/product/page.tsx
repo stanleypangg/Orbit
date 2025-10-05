@@ -283,10 +283,10 @@ export default function ProductDetail() {
             />
           </div>
           
-          {/* ESG Impact - Split into Graph + Metrics */}
-          <div className="flex flex-col gap-6 h-fit">
-            {/* Top: Graph - Takes remaining space */}
-            <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6">
+          {/* ESG Impact - Split into Graph + Metrics - Stretches to match 3D viewer height */}
+          <div className="flex flex-col gap-6">
+            {/* Top: Graph - Takes remaining space after square cards */}
+            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6 overflow-auto">
               <h3 className="text-[#67B68B] text-lg font-semibold mb-4">Environmental Impact</h3>
               
               {/* Simple Bar Chart */}
