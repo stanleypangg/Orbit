@@ -276,21 +276,21 @@ export default function ProductDetail() {
         <div className="grid grid-cols-[3fr_2fr] gap-6 mb-8">
           {/* 3D Model Viewer - Square */}
           <div className="aspect-square">
-            <ModelViewer
-              modelUrl={modelUrl}
-              isLoading={isGenerating}
-              error={error}
-            />
+          <ModelViewer
+            modelUrl={modelUrl}
+            isLoading={isGenerating}
+            error={error}
+          />
           </div>
           
           {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
-            {/* Top: Overall Score + Breakdown - Dynamic height */}
-            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded overflow-hidden flex flex-col">
-              {/* Overall ESG Score - Hero Section */}
-              <div className="bg-gradient-to-b from-[#161924] to-[#2A3038] border-b-[0.5px] border-[#67B68B]/30 p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">Overall Rating</div>
+            {/* Top: Radar Chart - Dynamic height */}
+            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded overflow-hidden flex flex-col items-center justify-center p-8">
+              <div className="w-full max-w-md">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">Impact Stats</div>
                   <div className="flex gap-1">
                     <div className="w-2 h-2 bg-[#67B68B] animate-pulse" />
                     <div className="w-2 h-2 bg-[#67B68B] animate-pulse" style={{ animationDelay: '0.2s' }} />
@@ -298,235 +298,242 @@ export default function ProductDetail() {
                   </div>
                 </div>
                 
-                <div className="flex items-end gap-4">
-                  <div className="flex items-baseline">
-                    <span className="text-6xl font-bold text-[#67B68B] font-mono leading-none">97</span>
-                    <span className="text-2xl text-gray-500 font-mono ml-1">/100</span>
+                {/* Overall Score */}
+                <div className="text-center mb-6">
+                  <div className="flex items-baseline justify-center gap-1 mb-2">
+                    <span className="text-5xl font-bold text-[#67B68B] font-mono">97</span>
+                    <span className="text-xl text-gray-500 font-mono">/100</span>
                   </div>
-                  
-                  <div className="flex-1 mb-2">
-                    <div className="text-xs text-gray-400 font-mono mb-2">ESG IMPACT SCORE</div>
-                    <div className="h-3 bg-[#161924] rounded-full overflow-hidden border border-[#67B68B]/20">
-                      <div 
-                        className="h-full bg-gradient-to-r from-[#67B68B] via-[#5BA3D0] to-[#4ade80] relative"
-                        style={{ width: '97%' }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-[9px] text-gray-600 font-mono mt-1">
-                      <span>POOR</span>
-                      <span>FAIR</span>
-                      <span>GOOD</span>
-                      <span className="text-[#67B68B]">EXCELLENT</span>
-                    </div>
+                  <div className="px-3 py-1 bg-[#67B68B]/10 border border-[#67B68B]/30 rounded text-[#67B68B] font-mono text-xs inline-block">
+                    S-RANK
                   </div>
                 </div>
                 
-                <div className="mt-4 flex items-center gap-2 text-xs">
-                  <div className="px-2 py-1 bg-[#67B68B]/10 border border-[#67B68B]/30 rounded text-[#67B68B] font-mono">
-                    S-RANK
-                  </div>
-                  <div className="text-gray-500 font-mono">→</div>
-                  <div className="text-gray-400 font-mono">Exceptional sustainability metrics</div>
-                </div>
-              </div>
-              
-              {/* Category Breakdown */}
-              <div className="flex-1 p-6 overflow-auto">
-                <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-4">Stat Breakdown</div>
-                <div className="space-y-4">
-                {/* Carbon Impact Score */}
-                <div className="bg-[#161924]/50 border border-[#67B68B]/30 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 border border-[#67B68B] flex items-center justify-center text-[#67B68B] text-xs font-mono">&gt;</div>
-                      <span className="text-xs text-gray-300 font-semibold">Carbon Impact</span>
-                    </div>
-                    <div className="flex items-baseline gap-0.5">
-                      <span className="text-xl font-bold text-[#67B68B] font-mono">98</span>
-                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
-                    </div>
-                  </div>
+                {/* Radar Chart */}
+                <div className="relative aspect-square w-full max-w-xs mx-auto">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    {/* Grid circles */}
+                    <circle cx="100" cy="100" r="80" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="100" r="60" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="100" r="40" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="100" r="20" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    
+                    {/* Axes */}
+                    <line x1="100" y1="100" x2="100" y2="20" stroke="#67B68B" strokeWidth="0.5" opacity="0.2" />
+                    <line x1="100" y1="100" x2="169.28" y2="160" stroke="#5BA3D0" strokeWidth="0.5" opacity="0.2" />
+                    <line x1="100" y1="100" x2="30.72" y2="160" stroke="#4ade80" strokeWidth="0.5" opacity="0.2" />
+                    
+                    {/* Data polygon */}
+                    <polygon 
+                      points="100,21.6 167.9,156.8 32.1,156.8"
+                      fill="url(#radarGradient)"
+                      stroke="#67B68B"
+                      strokeWidth="2"
+                      opacity="0.6"
+                    />
+                    
+                    {/* Data points */}
+                    <circle cx="100" cy="21.6" r="4" fill="#67B68B" />
+                    <circle cx="167.9" cy="156.8" r="4" fill="#5BA3D0" />
+                    <circle cx="32.1" cy="156.8" r="4" fill="#4ade80" />
+                    
+                    {/* Gradient definition */}
+                    <defs>
+                      <linearGradient id="radarGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#67B68B" stopOpacity="0.4" />
+                        <stop offset="50%" stopColor="#5BA3D0" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#4ade80" stopOpacity="0.4" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
                   
-                  {/* Score breakdown */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">EMISSIONS:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '98%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">98</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">ENERGY:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '95%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">95</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">TRANSPORT:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '100%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">100</span>
+                  {/* Labels */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6">
+                    <div className="text-xs text-[#67B68B] font-mono text-center">
+                      <div className="font-bold">98</div>
+                      <div className="text-[10px] text-gray-400">CARBON</div>
                     </div>
                   </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-[#67B68B]/10">
-                    <p className="text-[9px] text-gray-500 font-mono">
-                      <span className="text-[#67B68B]">{productData.esgData.co2EmissionsAvoided} kg</span> CO₂e saved vs. 2.5kg baseline
-                    </p>
-                  </div>
-                </div>
-
-                {/* Water Conservation Score */}
-                <div className="bg-[#161924]/50 border border-[#5BA3D0]/30 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 border border-[#5BA3D0] flex items-center justify-center text-[#5BA3D0] text-xs font-mono">~</div>
-                      <span className="text-xs text-gray-300 font-semibold">Water Conservation</span>
-                    </div>
-                    <div className="flex items-baseline gap-0.5">
-                      <span className="text-xl font-bold text-[#5BA3D0] font-mono">99</span>
-                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
+                  <div className="absolute bottom-0 right-0 translate-x-4 translate-y-6">
+                    <div className="text-xs text-[#5BA3D0] font-mono text-center">
+                      <div className="font-bold">99</div>
+                      <div className="text-[10px] text-gray-400">WATER</div>
                     </div>
                   </div>
-                  
-                  {/* Score breakdown */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">USAGE:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '99%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">99</span>
+                  <div className="absolute bottom-0 left-0 -translate-x-4 translate-y-6">
+                    <div className="text-xs text-[#4ade80] font-mono text-center">
+                      <div className="font-bold">96</div>
+                      <div className="text-[10px] text-gray-400">CIRCULAR</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">POLLUTION:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '100%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">100</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">TREATMENT:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '98%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">98</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-[#5BA3D0]/10">
-                    <p className="text-[9px] text-gray-500 font-mono">
-                      <span className="text-[#5BA3D0]">{productData.esgData.waterSaved} L</span> saved; no chemical treatment
-                    </p>
-                  </div>
-                </div>
-
-                {/* Circularity Score */}
-                <div className="bg-[#161924]/50 border border-[#4ade80]/30 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 border border-[#4ade80] flex items-center justify-center text-[#4ade80] text-xs font-mono">↻</div>
-                      <span className="text-xs text-gray-300 font-semibold">Circularity</span>
-                    </div>
-                    <div className="flex items-baseline gap-0.5">
-                      <span className="text-xl font-bold text-[#4ade80] font-mono">{productData.esgData.sustainabilityScore}</span>
-                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
-                    </div>
-                  </div>
-                  
-                  {/* Score breakdown */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">REUSE:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '100%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">100</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">LONGEVITY:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '95%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">95</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-gray-500 font-mono w-24">END-OF-LIFE:</span>
-                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '93%' }} />
-                      </div>
-                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">93</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-[#4ade80]/10">
-                    <p className="text-[9px] text-gray-500 font-mono">
-                      <span className="text-[#4ade80]">100% reclaimed</span> materials; fully recyclable
-                    </p>
                   </div>
                 </div>
               </div>
-            </div>
             </div>
             
-            {/* Bottom: Quick Stats - Square Video Game Tiles */}
+            {/* Bottom: Detailed Stats Breakdown - Horizontal Layout */}
             <div className="grid grid-cols-3 gap-4">
-              {/* Carbon Stat */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#67B68B]/20 transition-all">
+              {/* Carbon Impact Breakdown */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] rounded relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B]" />
                 <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#67B68B]" />
                 <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#67B68B]" />
                 
-                <div className="relative h-full flex flex-col items-center justify-center p-4">
-                  <div className="text-[10px] text-[#67B68B]/60 font-mono uppercase tracking-widest mb-2">CARBON</div>
-                  <div className="text-4xl font-bold text-[#67B68B] mb-1 font-mono">
-                    {productData.esgData.co2EmissionsAvoided}
+                <div className="relative flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border border-[#67B68B] flex items-center justify-center text-[#67B68B] text-[10px] font-mono">&gt;</div>
+                      <span className="text-[10px] text-[#67B68B] font-mono uppercase">Carbon</span>
+                    </div>
+                    <div className="text-xl font-bold text-[#67B68B] font-mono">98</div>
                   </div>
-                  <div className="text-[10px] text-gray-400 font-mono mb-2">kg CO₂</div>
-                  <div className="text-[8px] text-gray-600 font-mono uppercase">AVOIDED</div>
+                  
+                  <div className="space-y-2 flex-1">
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>EMISSIONS</span>
+                        <span className="text-[#67B68B]">98</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '98%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>ENERGY</span>
+                        <span className="text-[#67B68B]">95</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '95%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>TRANSPORT</span>
+                        <span className="text-[#67B68B]">100</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-[#67B68B]/20">
+                    <div className="text-[8px] text-gray-500 font-mono">
+                      <span className="text-[#67B68B]">{productData.esgData.co2EmissionsAvoided} kg</span> saved
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              {/* Water Stat */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#5BA3D0] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#5BA3D0]/20 transition-all">
+              {/* Water Conservation Breakdown */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#5BA3D0] rounded relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#5BA3D0]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#5BA3D0]" />
                 <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#5BA3D0]" />
                 <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#5BA3D0]" />
                 
-                <div className="relative h-full flex flex-col items-center justify-center p-4">
-                  <div className="text-[10px] text-[#5BA3D0]/60 font-mono uppercase tracking-widest mb-2">WATER</div>
-                  <div className="text-4xl font-bold text-[#5BA3D0] mb-1 font-mono">
-                    {productData.esgData.waterSaved}
+                <div className="relative flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border border-[#5BA3D0] flex items-center justify-center text-[#5BA3D0] text-[10px] font-mono">~</div>
+                      <span className="text-[10px] text-[#5BA3D0] font-mono uppercase">Water</span>
+                    </div>
+                    <div className="text-xl font-bold text-[#5BA3D0] font-mono">99</div>
                   </div>
-                  <div className="text-[10px] text-gray-400 font-mono mb-2">Liters</div>
-                  <div className="text-[8px] text-gray-600 font-mono uppercase">CONSERVED</div>
+                  
+                  <div className="space-y-2 flex-1">
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>USAGE</span>
+                        <span className="text-[#5BA3D0]">99</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '99%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>POLLUTION</span>
+                        <span className="text-[#5BA3D0]">100</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>TREATMENT</span>
+                        <span className="text-[#5BA3D0]">98</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '98%' }} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-[#5BA3D0]/20">
+                    <div className="text-[8px] text-gray-500 font-mono">
+                      <span className="text-[#5BA3D0]">{productData.esgData.waterSaved} L</span> conserved
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              {/* Circularity Stat */}
-              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#4ade80] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#4ade80]/20 transition-all">
+              {/* Circularity Breakdown */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#4ade80] rounded relative overflow-hidden p-4 flex flex-col">
                 {/* Corner decorations */}
                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#4ade80]" />
                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#4ade80]" />
                 <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#4ade80]" />
                 <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#4ade80]" />
                 
-                <div className="relative h-full flex flex-col items-center justify-center p-4">
-                  <div className="text-[10px] text-[#4ade80]/60 font-mono uppercase tracking-widest mb-2">CIRCULAR</div>
-                  <div className="text-4xl font-bold text-[#4ade80] mb-1 font-mono">
-                    {productData.esgData.sustainabilityScore}
+                <div className="relative flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border border-[#4ade80] flex items-center justify-center text-[#4ade80] text-[10px] font-mono">↻</div>
+                      <span className="text-[10px] text-[#4ade80] font-mono uppercase">Circular</span>
+                    </div>
+                    <div className="text-xl font-bold text-[#4ade80] font-mono">{productData.esgData.sustainabilityScore}</div>
                   </div>
-                  <div className="text-[10px] text-gray-400 font-mono mb-2">Score</div>
-                  <div className="text-[8px] text-gray-600 font-mono uppercase">RATING</div>
+                  
+                  <div className="space-y-2 flex-1">
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>REUSE</span>
+                        <span className="text-[#4ade80]">100</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>LONGEVITY</span>
+                        <span className="text-[#4ade80]">95</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '95%' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
+                        <span>END-OF-LIFE</span>
+                        <span className="text-[#4ade80]">93</span>
+                      </div>
+                      <div className="h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '93%' }} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-[#4ade80]/20">
+                    <div className="text-[8px] text-gray-500 font-mono">
+                      <span className="text-[#4ade80]">100%</span> reclaimed
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
