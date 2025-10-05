@@ -44,6 +44,7 @@ app.include_router(workflow_router)
 app.include_router(magic_pencil_router)
 app.include_router(storyboard_router, prefix="/api/storyboard", tags=["storyboard"])
 app.include_router(images_router)
+app.include_router(step_images_router)
 app.include_router(package_router, prefix="/api/package", tags=["package"])
 
 @app.get("/")
