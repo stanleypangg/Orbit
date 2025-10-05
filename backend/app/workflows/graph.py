@@ -67,21 +67,17 @@ class RecycleWorkflowOrchestrator:
         workflow.add_node("P1c_categorize", ingredient_categorizer_node)
         workflow.add_node("process_clarification", process_user_clarification)
 
-        # Phase 2: Goal Formation & Choice Generation (full implementation)
+        # Phase 2: Goal Formation & Choice Generation (simplified - no evaluation)
         workflow.add_node("G1_goal_formation", goal_formation_node)
         workflow.add_node("O1_choice_generation", choice_proposer_node)
-        workflow.add_node("E1_evaluation", evaluation_node)
+        # E1_evaluation removed - user selects directly from O1 options
 
-        # Phase 3: Image Generation & User Interaction (full implementation)
+        # Phase 3: Image Generation (runs automatically after O1)
         workflow.add_node("PR1_prompt_builder", prompt_builder_node)
         workflow.add_node("IMG_generation", image_generation_node)
         workflow.add_node("A1_assembly", preview_assembly_node)
-
-        # Phase 4: Output Assembly & Delivery (full implementation)
-        workflow.add_node("H1_packaging", final_packaging_node)
-        workflow.add_node("EXP_exports", export_generation_node)
-        workflow.add_node("ANALYTICS", analytics_node)
-        workflow.add_node("SHARE_prep", sharing_preparation_node)
+        
+        # Phase 4: Final packaging triggered manually via /select-concept endpoint (not in graph)
 
         # Entry point - always start with ingredient extraction
         workflow.add_edge(START, "P1a_extract")
@@ -113,7 +109,7 @@ class RecycleWorkflowOrchestrator:
             }
         )
 
-        # Phase 2 Flow (full implementation with conditional routing)
+        # Phase 2 Flow - Simplified: G1 → O1 → [User selects] → PR1
         workflow.add_conditional_edges(
             "G1_goal_formation",
             should_proceed_to_choices,
@@ -123,102 +119,15 @@ class RecycleWorkflowOrchestrator:
             }
         )
 
-        workflow.add_conditional_edges(
-            "O1_choice_generation",
-            should_proceed_to_evaluation,
-            {
-                "evaluation": "E1_evaluation",
-                "choice_generation": "O1_choice_generation"  # Loop back if no viable options
-            }
-        )
-
-        workflow.add_conditional_edges(
-            "E1_evaluation",
-            should_proceed_to_phase3,
-            {
-                "prompt_building": "PR1_prompt_builder",
-                "evaluation": "E1_evaluation"  # Loop back if no acceptable options
-            }
-        )
-
-        # Phase 3 Flow with conditional routing for Magic Pencil editing
+        # Phase 2 → Phase 3: Automatically continue to image generation
+        workflow.add_edge("O1_choice_generation", "PR1_prompt_builder")
+        
+        # Phase 3 Flow: PR1 → IMG → A1 → END (pause for user to select image)
         workflow.add_edge("PR1_prompt_builder", "IMG_generation")
-
-        # After image generation, may loop back for Magic Pencil editing
-        workflow.add_conditional_edges(
-            "IMG_generation",
-            should_proceed_to_assembly,
-            {
-                "assembly": "A1_assembly",
-                "magic_pencil": "IMG_generation"  # Loop back for iterative editing
-            }
-        )
-
-        # After assembly, may loop back for final edits
-        workflow.add_conditional_edges(
-            "A1_assembly",
-            should_proceed_to_magic_pencil,
-            {
-                "packaging": "H1_packaging",
-                "image_editing": "IMG_generation"  # Loop back for final image edits
-            }
-        )
-
-        # Phase 4 Flow - Parallel execution for exports, analytics, and sharing
-        workflow.add_conditional_edges(
-            "H1_packaging",
-            should_generate_exports,
-            {
-                "export_generation": "EXP_exports",
-                "final_packaging": "H1_packaging"  # Loop back if packaging incomplete
-            }
-        )
-
-        workflow.add_conditional_edges(
-            "H1_packaging",
-            should_generate_analytics,
-            {
-                "analytics": "ANALYTICS",
-                "final_packaging": "H1_packaging"  # Loop back if packaging incomplete
-            }
-        )
-
-        workflow.add_conditional_edges(
-            "H1_packaging",
-            should_prepare_sharing,
-            {
-                "sharing_preparation": "SHARE_prep",
-                "final_packaging": "H1_packaging"  # Loop back if packaging incomplete
-            }
-        )
-
-        # All Phase 4 nodes converge to completion check
-        workflow.add_conditional_edges(
-            "EXP_exports",
-            is_phase4_complete,
-            {
-                "END": END,
-                "continue": "H1_packaging"
-            }
-        )
-
-        workflow.add_conditional_edges(
-            "ANALYTICS",
-            is_phase4_complete,
-            {
-                "END": END,
-                "continue": "H1_packaging"
-            }
-        )
-
-        workflow.add_conditional_edges(
-            "SHARE_prep",
-            is_phase4_complete,
-            {
-                "END": END,
-                "continue": "H1_packaging"
-            }
-        )
+        workflow.add_edge("IMG_generation", "A1_assembly")
+        workflow.add_edge("A1_assembly", END)  # End here - user selects image/concept
+        
+        # Phase 4 triggered manually via /select-concept endpoint
 
         # Setup Redis checkpointer for interrupt/resume
         # Note: Checkpointing requires Redis with RedisJSON module

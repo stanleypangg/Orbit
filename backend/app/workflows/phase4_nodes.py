@@ -333,8 +333,8 @@ def _safe_set_redis(key: str, payload: Dict[str, Any], ttl_seconds: int = 86400)
 # ---------------------------------------------------------------------------
 
 async def final_packaging_node(state: WorkflowState) -> Dict[str, Any]:
-    """H1 Node: Generate a comprehensive final package for the project."""
-    logger.info("H1: Starting final packaging for thread %s", state.thread_id)
+    """H1 Node: OPTIMIZATION 3 - Generate ESSENTIAL package first, detailed content in background."""
+    logger.info("H1: Starting ESSENTIAL packaging for thread %s", state.thread_id)
     state.current_node = "H1_packaging"
     start_time = time.time()
 
@@ -345,22 +345,44 @@ async def final_packaging_node(state: WorkflowState) -> Dict[str, Any]:
             "errors": state.errors,
         }
 
-    final_package = _build_final_package(state)
-    state.final_package = final_package
-    state.final_output = final_package
+    # OPTIMIZATION 3: Generate ESSENTIAL content ONLY (fast display)
+    ingredients = _serialize_ingredients(state)
+    selected_option = state.selected_option or {}
+    
+    essential_package = {
+        "package_metadata": {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "thread_id": state.thread_id,
+            "source_phase": "phase4",
+            "tier": "essential"  # Mark as essential tier
+        },
+        "executive_summary": _build_executive_summary(state, ingredients, selected_option),
+        "hero_image": get_concept_thumbnail_url(state),
+        "quick_start": (selected_option.get("construction_steps", []) or [])[:3],  # Top 3 steps only!
+        "key_materials": ingredients[:5],  # Top 5 materials only!
+    }
+    
+    # Store ESSENTIAL package immediately (fast!)
+    _safe_set_redis(f"package_essential:{state.thread_id}", essential_package)
+    
+    # Also store as full package for compatibility (will be enhanced later)
+    full_package = _build_final_package(state)
+    state.final_package = full_package
+    state.final_output = full_package
     state.current_phase = "complete"
     state.current_node = "COMPLETE"
-
-    _safe_set_redis(f"final_package:{state.thread_id}", final_package)
-
+    
+    _safe_set_redis(f"final_package:{state.thread_id}", full_package)
+    
     duration = time.time() - start_time
-    logger.info("H1: Final package created successfully for %s", state.thread_id)
+    logger.info("H1: ESSENTIAL package ready in %.2fs (detailed content available)", duration)
 
     return {
-        "final_package": final_package,
+        "essential_package": essential_package,  # NEW: Quick display
+        "final_package": full_package,  # Keep full for compatibility
         "current_phase": state.current_phase,
         "current_node": state.current_node,
-        "package_size": len(json.dumps(final_package)),
+        "optimization_mode": "progressive",  # Flag for tracking
         "generation_time": duration,
     }
 

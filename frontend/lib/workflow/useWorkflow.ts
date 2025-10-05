@@ -115,8 +115,10 @@ export function useWorkflow({
               'P1c_categorize': '📦 Organizing ingredients...',
               'G1_goal_formation': '🎯 Understanding your goals...',
               'O1_choice_generation': '💡 Generating creative options...',
+              'O1_detailed': '📝 Creating detailed plan for your selection...',
               'E1_evaluation': '✨ Evaluating feasibility...',
               'PR1_prompt_builder': '🎨 Crafting concept prompts...',
+              'IMG_hero': '🖼️ Generating your concept image...',
               'IMG_generation': '🖼️ Generating concept images...',
             };
             

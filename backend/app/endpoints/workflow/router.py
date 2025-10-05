@@ -155,7 +155,17 @@ async def stream_workflow(thread_id: str):
                         choices["sent"] = True
                         redis_service.set(choices_key, json.dumps(choices), ex=3600)
 
-                # Check for concept generation updates
+                # OPTIMIZATION 2: Check for hero image (single image, fast display)
+                hero_key = f"hero_image:{thread_id}"
+                hero_data = redis_service.get(hero_key)
+                if hero_data:
+                    hero = json.loads(hero_data)
+                    if hero.get("ready") and not hero.get("sent"):
+                        yield f"data: {json.dumps({'type': 'hero_image_ready', 'data': hero})}\n\n"
+                        hero["sent"] = True
+                        redis_service.set(hero_key, json.dumps(hero), ex=3600)
+                
+                # Check for concept generation updates (full set)
                 concepts_key = f"concepts:{thread_id}"
                 concepts_data = redis_service.get(concepts_key)
 
@@ -188,7 +198,17 @@ async def stream_workflow(thread_id: str):
                         selection["sent"] = True
                         redis_service.set(selection_key, json.dumps(selection), ex=3600)
 
-                # Check for final package
+                # OPTIMIZATION 3: Check for essential package first (fast display)
+                essential_key = f"package_essential:{thread_id}"
+                essential_data = redis_service.get(essential_key)
+                if essential_data:
+                    essential = json.loads(essential_data)
+                    if not essential.get("sent"):
+                        yield f"data: {json.dumps({'type': 'package_essential_ready', 'data': essential})}\n\n"
+                        essential["sent"] = True
+                        redis_service.set(essential_key, json.dumps(essential), ex=3600)
+                
+                # Check for final package (full/detailed)
                 package_key = f"project_package:{thread_id}"
                 package_data = redis_service.get(package_key)
 
@@ -553,20 +573,27 @@ async def select_option(
         }
         redis_service.set(selection_key, json.dumps(selection_data), ex=3600)
 
-        # Update workflow state to proceed to Phase 3
+        # OPTIMIZATION 1: Queue background task to generate details + proceed
+        background_tasks.add_task(
+            generate_detailed_and_continue,
+            thread_id,
+            request.option_id,
+            selected_option
+        )
+        
+        # Update workflow state to show progress
         state_key = f"workflow_state:{thread_id}"
-        state_data = redis_service.get(state_key)
-        if state_data:
-            state = json.loads(state_data)
-            state["selected_option"] = selected_option
-            state["current_phase"] = "concept_generation"
-            state["current_node"] = "PR1"
-            redis_service.set(state_key, json.dumps(state), ex=3600)
+        redis_service.set(state_key, json.dumps({
+            "status": "running",
+            "current_phase": "concept_generation",
+            "current_node": "O1_detailed",  # Generating details
+            "result": {}
+        }), ex=3600)
 
         return {
-            "message": "Option selected successfully",
+            "message": "Option selected, generating detailed information...",
             "option_id": request.option_id,
-            "status": "proceeding_to_concept_generation"
+            "status": "generating_details"
         }
 
     except json.JSONDecodeError:
@@ -928,12 +955,19 @@ async def run_workflow_background(thread_id: str, user_input: str):
         result = await workflow_task
         logger.info(f"Workflow result: {result}")
 
-        # Store final workflow state
+        # Store final workflow state (serialize properly)
+        result_data = result.get("result", {})
+        
+        # Convert IngredientsData to dict if present
+        if result_data.get("ingredients_data"):
+            if hasattr(result_data["ingredients_data"], "model_dump"):
+                result_data["ingredients_data"] = result_data["ingredients_data"].model_dump()
+        
         final_state = {
             "status": result.get("status", "complete"),
-            "current_phase": result.get("result", {}).get("current_phase", "complete"),
-            "current_node": result.get("result", {}).get("current_node", "END"),
-            "result": result.get("result", {})
+            "current_phase": result_data.get("current_phase", "complete"),
+            "current_node": result_data.get("current_node", "END"),
+            "result": result_data
         }
         redis_service.set(state_key, json.dumps(final_state), ex=3600)
         
@@ -961,6 +995,87 @@ async def run_workflow_background(thread_id: str, user_input: str):
         logger = logging.getLogger(__name__)
         logger.error(f"Workflow error for {thread_id}: {str(e)}")
         logger.error(traceback.format_exc())
+        # Store error
+        error_key = f"workflow_error:{thread_id}"
+        redis_service.set(error_key, json.dumps({"error": str(e)}), ex=3600)
+
+
+async def generate_detailed_and_continue(thread_id: str, option_id: str, selected_lite_option: Dict[str, Any]):
+    """
+    Generate final package for selected idea/image combo.
+    Runs in background after user selects a concept image.
+    """
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting Phase 4 (final packaging) for selected option {option_id}")
+        
+        # Load workflow state
+        from app.workflows.nodes import load_ingredients_from_redis
+        from app.workflows.state import WorkflowState
+        from app.workflows.phase4_nodes import final_packaging_node
+        
+        state_key = f"workflow_state:{thread_id}"
+        state_data = redis_service.get(state_key)
+        
+        if state_data:
+            state_dict = json.loads(state_data)
+            ingredients_data = load_ingredients_from_redis(thread_id)
+            
+            # Load goals from Redis
+            goals_key = f"goals:{thread_id}"
+            goals_data = redis_service.get(goals_key)
+            goals_info = json.loads(goals_data) if goals_data else {}
+            
+            # Load concept images
+            concepts_key = f"concepts:{thread_id}"
+            concepts_data = redis_service.get(concepts_key)
+            concept_images = json.loads(concepts_data) if concepts_data else {}
+            
+            # Create WorkflowState for Phase 4
+            workflow_state = WorkflowState(
+                thread_id=thread_id,
+                ingredients_data=ingredients_data,
+                selected_option=selected_lite_option,
+                concept_images=concept_images,
+                user_input=state_dict.get("result", {}).get("user_input", ""),
+                goals=goals_info.get("primary_goal", ""),
+                artifact_type=goals_info.get("artifact_type", ""),
+                current_phase="output_assembly",
+                current_node="H1"
+            )
+            
+            # Run Phase 4: H1 - Final packaging
+            logger.info("Phase 4: H1 - Final packaging")
+            result_h1 = await final_packaging_node(workflow_state)
+            
+            # Store complete workflow result
+            redis_service.set(state_key, json.dumps({
+                "status": "complete",
+                "current_phase": "complete",
+                "current_node": "COMPLETE",
+                "result": {
+                    "final_package": result_h1.get("final_package"),
+                    "essential_package": result_h1.get("essential_package")
+                }
+            }), ex=3600)
+            
+            # Mark workflow as complete
+            completion_key = f"workflow_complete:{thread_id}"
+            redis_service.set(completion_key, json.dumps({
+                "status": "complete",
+                "final_package": result_h1.get("final_package")
+            }), ex=3600)
+            
+            logger.info(f"Phase 4 complete for {thread_id}")
+            
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to complete Phase 4: {str(e)}")
+        logger.error(traceback.format_exc())
+        
         # Store error
         error_key = f"workflow_error:{thread_id}"
         redis_service.set(error_key, json.dumps({"error": str(e)}), ex=3600)

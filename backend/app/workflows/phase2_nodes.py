@@ -85,6 +85,36 @@ GOAL_FORMATION_SCHEMA = _sanitize_response_schema({
     "required": ["primary_goal", "artifact_type", "project_complexity"]
 })
 
+# OPTIMIZATION 1: Lite schema for fast initial choice display
+CHOICE_GENERATION_LITE_SCHEMA = _sanitize_response_schema({
+    "type": "object",
+    "properties": {
+        "viable_options": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "option_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "tagline": {"type": "string"},  # NEW: 1-sentence pitch
+                    "description": {"type": "string"},  # Brief description
+                    "category": {"type": "string"},
+                    "key_materials": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "difficulty_level": {"type": "string", "enum": ["beginner", "intermediate", "advanced"]},
+                    "estimated_time": {"type": "string"},
+                    "style_hint": {"type": "string"}  # NEW: "minimalist", "decorative", "functional"
+                },
+                "required": ["option_id", "title", "tagline", "description"]
+            }
+        }
+    },
+    "required": ["viable_options"]
+})
+
+# Full detailed schema (used after user selects an option)
 CHOICE_GENERATION_SCHEMA = _sanitize_response_schema({
     "type": "object",
     "properties": {
@@ -365,7 +395,8 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
         for ing in state.ingredients_data.ingredients
     ]
 
-    choice_prompt = f"""
+    # OPTIMIZATION 1: Generate LITE options first (summaries only)
+    choice_prompt_lite = f"""
     You are a creative design expert specializing in upcycling and sustainable product development.
 
     PROJECT GOAL: {state.goals}
@@ -375,58 +406,54 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
     AVAILABLE MATERIALS:
     {chr(10).join(ingredients_list)}
 
-    CONSTRAINTS:
-    - Budget category: {state.user_constraints.get('budget_category', 'minimal')}
-    - Tool complexity: {state.user_constraints.get('tool_complexity', 'basic')}
-    - Estimated time: {state.user_constraints.get('estimated_time', 'flexible')}
-    - Safety considerations: {', '.join(state.user_constraints.get('safety_considerations', []))}
-    - IMPORTANT exactly 9 Steps for completing the project {state.user_constraints.get('storyboard_9_steps', [])}.
-
-    Generate 3 distinct, viable project options that:
+    Generate 3 distinct, viable project options as BRIEF SUMMARIES ONLY:
     1. Use the available materials effectively
     2. Achieve the stated goal
     3. Vary in approach/style (minimalist, decorative, functional, etc.)
-    4. Are feasible with basic to intermediate tools
-    5. Follow safety best practices
-    6. Demonstrate different levels of creativity and innovation
 
-    For each option, provide:
-    - Clear title and description
-    - Specific materials usage from the available list
-    - Step-by-step construction approach
-    - Required tools (keep realistic)
-    - Time estimate and difficulty
-    - Innovation and practicality scores
+    For each option, provide ONLY:
+    - title: Catchy project name
+    - tagline: One sentence pitch
+    - description: 2-3 sentence overview (not full details!)
+    - category: Project type
+    - key_materials: Top 3-4 materials used
+    - difficulty_level: beginner/intermediate/advanced
+    - estimated_time: Rough time estimate
+    - style_hint: "minimalist" or "decorative" or "functional"
 
-    Focus on options that are genuinely buildable and useful.
+    Keep descriptions brief and engaging - detailed steps will come later.
+    Focus on helping users choose between different creative approaches.
     """
 
     try:
-        # Call Gemini Pro for creative choice generation
+        # Call Gemini Pro for LITE creative choice generation (MUCH FASTER!)
         response = await production_call_gemini(
-            prompt=choice_prompt,
+            prompt=choice_prompt_lite,
             task_type="creative",
-            response_schema=CHOICE_GENERATION_SCHEMA
+            response_schema=CHOICE_GENERATION_LITE_SCHEMA  # Use lite schema
         )
 
         if response and not response.get("error"):
             choice_data = response  # Response is already parsed JSON
             viable_options = choice_data.get("viable_options", [])
 
-            # Convert to state format and store
+            # Store options - will generate images for these next
             state.viable_options = viable_options
 
             # Save choices to Redis
             choices_key = f"choices:{state.thread_id}"
             redis_service.set(choices_key, json.dumps(choice_data), ex=3600)
 
-            state.current_node = "E1"
-            logger.info(f"O1: Generated {len(viable_options)} viable project options")
+            # Continue to image generation for these ideas (don't pause yet!)
+            state.current_node = "IMG"
+            state.current_phase = "concept_generation"
+            logger.info(f"O1: Generated {len(viable_options)} project ideas, proceeding to image generation")
 
             return {
                 "viable_options": viable_options,
-                "current_node": "E1",
-                "generation_metadata": choice_data.get("generation_metadata", {})
+                "current_node": "IMG",
+                "current_phase": "concept_generation",
+                "generation_metadata": choice_data.get("generation_metadata", {}),
             }
         else:
             error_message = response.get("error", "Unknown error") if response else "No response"
@@ -468,6 +495,68 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
         "viable_options": state.viable_options,
         "current_node": "E1"
     }
+
+
+async def generate_detailed_option(state: WorkflowState, option_id: str) -> Dict[str, Any]:
+    """
+    OPTIMIZATION 1: Generate FULL details for a single selected option.
+    Called after user selects from lite options.
+    """
+    logger.info(f"O1_detailed: Generating full details for option {option_id}")
+    
+    # Find the selected lite option
+    selected_lite = next((opt for opt in state.viable_options if opt.get("option_id") == option_id), None)
+    if not selected_lite:
+        logger.error(f"O1_detailed: Option {option_id} not found")
+        return {"error": "Option not found"}
+    
+    ingredients_list = [
+        f"- {ing.name} ({ing.material}, {ing.size})"
+        for ing in state.ingredients_data.ingredients
+    ]
+    
+    detailed_prompt = f"""
+    You are a creative design expert. Generate COMPLETE DETAILED information for this selected project option:
+
+    SELECTED OPTION:
+    - Title: {selected_lite.get('title')}
+    - Tagline: {selected_lite.get('tagline')}
+    - Style: {selected_lite.get('style_hint', 'functional')}
+    
+    PROJECT GOAL: {state.goals}
+    AVAILABLE MATERIALS: {chr(10).join(ingredients_list)}
+
+    Generate FULL details including:
+    - Complete construction steps (exactly 9 steps as specified in constraints)
+    - All required tools (be specific)
+    - All materials used from the available list
+    - Innovation score (0.0-1.0)
+    - Practicality score (0.0-1.0)
+    
+    Make this a complete, buildable plan.
+    """
+    
+    try:
+        response = await production_call_gemini(
+            prompt=detailed_prompt,
+            task_type="creative",
+            response_schema=CHOICE_GENERATION_SCHEMA  # Use full schema for details
+        )
+        
+        if response and not response.get("error"):
+            detailed_data = response
+            if detailed_data.get("viable_options"):
+                detailed_option = detailed_data["viable_options"][0]
+                # Merge lite data with detailed data
+                detailed_option.update(selected_lite)
+                return detailed_option
+        
+        logger.error("O1_detailed: Failed to generate details")
+        return selected_lite  # Return lite version as fallback
+        
+    except Exception as e:
+        logger.error(f"O1_detailed: Error generating details: {e}")
+        return selected_lite
 
 
 async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:

@@ -13,7 +13,10 @@ interface WorkflowOption {
   title: string;
   description: string;
   category?: string;
-  materials_used: string[];
+  materials_used?: string[];  // Made optional for lite options
+  key_materials?: string[];  // NEW: Lite version
+  tagline?: string;  // NEW: 1-sentence pitch
+  style_hint?: string;  // NEW: "minimalist", "decorative", "functional"
   construction_steps?: string[];
   tools_required?: string[];
   estimated_time?: string;
@@ -493,40 +496,52 @@ export default function Home() {
                     {message.projectOptions && message.projectOptions.length > 0 && (
                       <div className="mt-4">
                         <div className="grid grid-cols-1 gap-3">
-                          {message.projectOptions.map((option) => (
-                            <div
-                              key={option.option_id}
-                              onClick={() => handleOptionSelect(option.option_id)}
-                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
-                              style={{ animation: "fadeIn 0.5s ease-out forwards" }}
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <h4 className="text-white font-semibold text-lg">{option.title}</h4>
-                                {option.difficulty_level && (
-                                  <span className={`text-xs px-2 py-1 rounded ${
-                                    option.difficulty_level === 'beginner' ? 'bg-green-900 text-green-200' :
-                                    option.difficulty_level === 'intermediate' ? 'bg-yellow-900 text-yellow-200' :
-                                    'bg-red-900 text-red-200'
-                                  }`}>
-                                    {option.difficulty_level}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-gray-400 text-sm mb-3">{option.description}</p>
-                              <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-2">
-                                {option.estimated_time && <span>⏱️ {option.estimated_time}</span>}
-                                {option.materials_used && <span>🔧 {option.materials_used.length} materials</span>}
-                                {option.tools_required && option.tools_required.length > 0 && (
-                                  <span>🛠️ {option.tools_required.slice(0, 2).join(', ')}</span>
-                                )}
-                              </div>
-                              {option.construction_steps && option.construction_steps.length > 0 && (
-                                <div className="text-xs text-gray-500 mt-2">
-                                  <strong>{option.construction_steps.length} steps</strong> • Innovation: {Math.round((option.innovation_score || 0) * 100)}%
+                          {message.projectOptions.map((option) => {
+                            // OPTIMIZATION 1: Handle both lite and detailed options
+                            const materials = option.materials_used || option.key_materials || [];
+                            const hasDetails = option.construction_steps && option.construction_steps.length > 0;
+                            
+                            return (
+                              <div
+                                key={option.option_id}
+                                onClick={() => handleOptionSelect(option.option_id)}
+                                className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
+                                style={{ animation: "fadeIn 0.5s ease-out forwards" }}
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <h4 className="text-white font-semibold text-lg">{option.title}</h4>
+                                    {option.tagline && (
+                                      <p className="text-[#4ade80] text-sm italic mt-1">{option.tagline}</p>
+                                    )}
+                                  </div>
+                                  {option.difficulty_level && (
+                                    <span className={`text-xs px-2 py-1 rounded ${
+                                      option.difficulty_level === 'beginner' ? 'bg-green-900 text-green-200' :
+                                      option.difficulty_level === 'intermediate' ? 'bg-yellow-900 text-yellow-200' :
+                                      'bg-red-900 text-red-200'
+                                    }`}>
+                                      {option.difficulty_level}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                <p className="text-gray-400 text-sm mb-3">{option.description}</p>
+                                <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-2">
+                                  {option.estimated_time && <span>⏱️ {option.estimated_time}</span>}
+                                  {materials.length > 0 && <span>🔧 {materials.length} materials</span>}
+                                  {option.style_hint && <span>🎨 {option.style_hint}</span>}
+                                  {option.tools_required && option.tools_required.length > 0 && (
+                                    <span>🛠️ {option.tools_required.slice(0, 2).join(', ')}</span>
+                                  )}
+                                </div>
+                                {hasDetails && (
+                                  <div className="text-xs text-gray-500 mt-2">
+                                    <strong>{option.construction_steps?.length || 0} steps</strong> • Innovation: {Math.round((option.innovation_score || 0) * 100)}%
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

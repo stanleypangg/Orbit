@@ -115,6 +115,7 @@ export default function Home() {
       >
         {/* Isometric room video */}
         <div className="relative cursor-pointer" onClick={handleClick}>
+          <img className="w-[600px] h-[600px] object-cover absolute" src="/landing_mask.png" alt="" />
           <video
             ref={videoRef}
             autoPlay

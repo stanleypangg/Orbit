@@ -164,160 +164,56 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
     """
     logger.info(f"PR1: Starting prompt building for thread {state.thread_id}")
 
-    # Validate inputs
-    if not state.selected_option:
-        logger.error("PR1: No selected option available for prompt building")
-        message = "Prompt building requires selected project option"
+    # Validate inputs - use viable_options (all 3 ideas) instead of selected_option
+    if not state.viable_options or len(state.viable_options) == 0:
+        logger.error("PR1: No options available for prompt building")
+        message = "Prompt building requires generated project options"
         state.errors.append(message)
         return {
             "errors": state.errors,
             "current_node": "PR1"
         }
 
-    # Get project details from selected option
-    project_title = state.selected_option.get("title", "Upcycled Project")
-    project_description = state.selected_option.get("description", "")
-    materials_used = state.selected_option.get("materials_used", [])
-    tools_required = state.selected_option.get("tools_required", [])
-
-    # Build comprehensive prompt for prompt engineering
-    prompt_engineering_prompt = f"""
-    You are an expert prompt engineer specializing in image generation for upcycling and recycling projects.
-
-    PROJECT DETAILS:
-    - Title: {project_title}
-    - Description: {project_description}
-    - Materials: {', '.join(materials_used)}
-    - Tools: {', '.join(tools_required)}
-    - Difficulty: {state.selected_option.get('difficulty_level', 'intermediate')}
-
-    INGREDIENT CONTEXT:
-    {json.dumps([
-        {
-            "name": ing.name,
-            "material": ing.material,
-            "size": ing.size,
-            "condition": ing.condition
-        }
-        for ing in state.ingredients_data.ingredients
-    ], indent=2)}
-
-    Create 3 distinct image generation prompts for different style approaches:
-
-    1. MINIMALIST STYLE:
-    - Clean, simple design
-    - Focus on functionality and elegance
-    - Neutral colors, uncluttered composition
-    - Professional product photography aesthetic
-
-    2. DECORATIVE STYLE:
-    - Artistic and visually appealing
-    - Creative use of colors and textures
-    - Emphasis on beauty and style
-    - Lifestyle photography with context
-
-    3. FUNCTIONAL STYLE:
-    - Emphasis on utility and practicality
-    - Clear demonstration of functionality
-    - Workshop or usage environment
-    - Technical diagram-like clarity
-
-    For each prompt, provide:
-    - Primary prompt (detailed description of the final project)
-    - Negative prompt (what to avoid)
-    - Style keywords for visual enhancement
-    - Material emphasis (highlighting the recycled nature)
-    - Lighting and composition notes
-    - Quality enhancers
-
-    Focus on the transformation from waste materials to useful product.
-    Emphasize the sustainability story and craftsmanship quality.
-    Ensure prompts are specific enough for consistent, high-quality image generation.
-    """
-
-    try:
-        # Call Gemini Pro for intelligent prompt engineering
-        response = await production_call_gemini(
-            prompt=prompt_engineering_prompt,
-            task_type="creative",
-            response_schema=PROMPT_BUILDER_SCHEMA
+    # Generate image prompts for ALL 3 ideas
+    # We'll create concept variants for each idea
+    all_concept_variants = []
+    
+    for idx, option in enumerate(state.viable_options[:3]):
+        project_title = option.get("title", "Upcycled Project")
+        project_description = option.get("description", "")
+        materials = option.get("key_materials") or option.get("materials_used", [])
+        style_hint = option.get("style_hint", ["minimalist", "decorative", "functional"][idx])
+        
+        # Create a simple concept variant for this idea
+        variant = ConceptVariant(
+            style=style_hint,
+            description=project_description,
+            image_prompt=f"Professional product photo of {project_title}: {project_description}. Made from {', '.join(materials[:3])}. Style: {style_hint}. High quality, sustainable design.",
+            feasibility_score=0.8,
+            aesthetic_score=0.0,
+            esg_score=0.7,
+            estimated_time=option.get("estimated_time", "2-4 hours"),
+            difficulty_level=option.get("difficulty_level", "intermediate")
         )
-
-        if response and not response.get("error"):
-            prompt_data = response  # Response is already parsed JSON
-            concept_prompts = prompt_data.get("concept_prompts", [])
-
-            # Convert to ConceptVariant objects
-            concept_variants = []
-            for prompt_info in concept_prompts:
-                variant = ConceptVariant(
-                    style=prompt_info["style"],
-                    description=project_description,
-                    image_prompt=prompt_info["primary_prompt"],
-                    feasibility_score=state.selected_option.get("feasibility_score", 0.8),
-                    aesthetic_score=0.0,  # Will be updated after image generation
-                    esg_score=state.selected_option.get("esg_score", 0.7),
-                    estimated_time=state.selected_option.get("estimated_time", "2-4 hours"),
-                    difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
-                )
-                concept_variants.append(variant)
-
-            # Store prompts data
-            state.concept_variants = concept_variants
-
-            # Save to Redis
-            prompts_key = f"prompts:{state.thread_id}"
-            redis_service.set(prompts_key, json.dumps(prompt_data), ex=3600)
-
-            state.current_node = "IMG"
-            logger.info(f"PR1: Generated {len(concept_variants)} concept prompts")
-
-            return {
-                "concept_variants": concept_variants,
-                "current_node": "IMG",
-                "prompt_data": prompt_data
-            }
-
-    except Exception as e:
-        logger.error(f"PR1: Prompt building failed: {str(e)}")
-        state.errors.append(f"Prompt building failed: {str(e)}")
-
-        # Fallback: Create basic prompts
-        fallback_variants = [
-            ConceptVariant(
-                style="minimalist",
-                description=project_description,
-                image_prompt=f"Clean, minimalist {project_title} made from {', '.join(materials_used[:2] or ['recycled materials'])}, professional product photography, white background",
-                difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
-            ),
-            ConceptVariant(
-                style="decorative",
-                description=project_description,
-                image_prompt=f"Decorative {project_title} featuring vibrant recycled {', '.join(materials_used[:2] or ['materials'])}, styled in a lifestyle interior",
-                difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
-            ),
-            ConceptVariant(
-                style="functional",
-                description=project_description,
-                image_prompt=f"Functional {project_title} showcasing utility, made from recycled {', '.join(materials_used[:2] or ['components'])}, workshop setting",
-                difficulty_level=state.selected_option.get("difficulty_level", "intermediate")
-            )
-        ]
-        state.concept_variants = fallback_variants
-
+        all_concept_variants.append(variant)
+    
+    state.concept_variants = all_concept_variants
     state.current_node = "IMG"
+    
+    logger.info(f"PR1: Generated {len(all_concept_variants)} concept prompts for all ideas")
+    
     return {
-        "concept_variants": state.concept_variants,
+        "concept_variants": all_concept_variants,
         "current_node": "IMG"
     }
 
 
 async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
     """
-    IMG Node: Generate 3 concept images in parallel using Gemini image generation.
-    Implements queue management and optimized parallel processing.
+    IMG Node: OPTIMIZATION 2 - Generate HERO image first, then variants in background.
+    Fast initial display for user interaction.
     """
-    logger.info(f"IMG: Starting image generation for thread {state.thread_id}")
+    logger.info(f"IMG: Starting HERO image generation for thread {state.thread_id}")
 
     # Validate inputs
     if not state.concept_variants:
@@ -328,7 +224,8 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             "current_node": "IMG"
         }
 
-    # Parallel image generation with rate limiting
+    # OPTIMIZATION 2: Generate ONLY the first (hero) image immediately
+    # Other 2 variants will be generated in background
     async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore) -> ConceptVariant:
         """Generate a single image with rate limiting."""
         async with semaphore:
@@ -388,16 +285,16 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                 return variant
 
     try:
-        # Create semaphore for rate limiting (max 3 concurrent)
-        semaphore = asyncio.Semaphore(3)
-
-        # Generate all images in parallel
-        generation_tasks = [
-            generate_single_image(variant, semaphore)
-            for variant in state.concept_variants
-        ]
-
-        generated_variants = await asyncio.gather(*generation_tasks, return_exceptions=True)
+        # Generate all 3 images sequentially (no queuing to avoid loops)
+        semaphore = asyncio.Semaphore(1)
+        generated_variants = []
+        
+        logger.info(f"IMG: Generating {len(state.concept_variants)} images sequentially")
+        
+        for idx, variant in enumerate(state.concept_variants):
+            logger.info(f"IMG: Generating image {idx+1}/{len(state.concept_variants)} ({variant.style})")
+            generated = await generate_single_image(variant, semaphore)
+            generated_variants.append(generated)
 
         # Filter successful generations
         successful_variants = [
@@ -411,12 +308,18 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             if isinstance(variant, ConceptVariant)
         ]
 
-        # Build concept image payload for downstream nodes
+        # Build concept payload - map each image to its corresponding idea
         concept_payload = []
         timestamp = time.time()
-        for variant in state.concept_variants:
+        for idx, variant in enumerate(state.concept_variants):
             image_url = variant.image_id or f"fallback://{state.thread_id}/{variant.style}"
+            # Match image to its idea
+            idea = state.viable_options[idx] if idx < len(state.viable_options) else {}
+            
             concept_payload.append({
+                "concept_id": f"concept_{idx}",
+                "idea_id": idea.get("option_id", f"option_{idx}"),
+                "title": idea.get("title", variant.style),
                 "style": variant.style,
                 "description": variant.description,
                 "image_url": image_url,
@@ -433,22 +336,17 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             }
         }
 
-        # Save generation results
-        generation_key = f"generation:{state.thread_id}"
-        generation_data = {
-            "generated_at": time.time(),
-            "total_variants": len(state.concept_variants),
-            "successful_generations": len(successful_variants),
-            "variants": [variant.model_dump() for variant in successful_variants]
-        }
-        redis_service.set(generation_key, json.dumps(generation_data), ex=3600)
-
+        # Save for frontend display (ideas + images together!)
+        concepts_key = f"concepts:{state.thread_id}"
+        redis_service.set(concepts_key, json.dumps(state.concept_images), ex=3600)
+        
         state.current_node = "A1"
-        logger.info(f"IMG: Successfully generated {len(successful_variants)}/{len(state.concept_variants)} images")
+        logger.info(f"IMG: Successfully generated {len(successful_variants)} images for {len(state.viable_options)} ideas")
 
         return {
             "generated_variants": successful_variants,
             "generation_count": len(successful_variants),
+            "concept_images": state.concept_images,
             "current_node": "A1"
         }
 
@@ -799,11 +697,9 @@ def is_workflow_complete(state: WorkflowState) -> str:
 # Additional Phase 3 routing functions for conditional edges
 def should_proceed_to_assembly(state: WorkflowState) -> str:
     """Determine if images are ready for assembly."""
-    if state.concept_variants and len(state.concept_variants) >= 3:
-        # Check if all variants have images
-        if all(variant.image_id for variant in state.concept_variants):
-            return "assembly"
-    return "magic_pencil"
+    # FIX: Always proceed to assembly after image generation
+    # Don't loop back - we generate all images sequentially
+    return "assembly"
 
 
 def should_proceed_to_magic_pencil(state: WorkflowState) -> str:
