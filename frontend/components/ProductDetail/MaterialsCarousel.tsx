@@ -70,7 +70,7 @@ export default function MaterialsCarousel({
         {/* Materials Container */}
         <div
           ref={containerRef}
-          className="overflow-hidden px-12"
+          className="overflow-hidden pr-12"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div
@@ -98,7 +98,7 @@ export default function MaterialsCarousel({
                     style={{ height: "108px", width: "auto" }}
                   />
                 </div>
-                <span className="text-[#67B68B] text-sm text-center whitespace-nowrap">
+                <span className="text-[#67B68B] text-md tracking-wider text-center whitespace-nowrap">
                   {material.name}
                 </span>
               </div>
