@@ -32,7 +32,7 @@ class GeminiImageEditor:
 
 **INPUTS:**
 1. **Reference Image**: The original image that must be preserved EXACTLY outside edit areas
-2. **Drawn Overlay**: Shows the red markings indicating where user wants edits
+2. **Drawn Overlay**: Shows the green markings indicating where user wants edits
 3. **Pure Mask**: Binary mask (white = edit area, black = preserve area)
 4. **User Prompt**: "{user_prompt}"
 
@@ -80,7 +80,7 @@ Return a single edited image where:
         
         Args:
             original_image_b64: Base64 of reference image (must be preserved)
-            drawn_overlay_b64: Base64 of image with red drawings
+            drawn_overlay_b64: Base64 of image with green drawings
             pure_mask_b64: Base64 of binary mask (white = edit, black = preserve)
             user_prompt: User's edit description
             
@@ -108,7 +108,7 @@ Return a single edited image where:
 
 IMAGES:
 1. Original image (preserve areas where mask is black)
-2. Drawn overlay (shows edit areas in red)
+2. Drawn overlay (shows edit areas in green)
 3. Binary mask (white = edit, black = preserve)
 
 TASK: {user_prompt}

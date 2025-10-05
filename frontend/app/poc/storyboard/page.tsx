@@ -69,33 +69,24 @@ export default function StoryboardPage() {
 
   return (
     <div className="min-h-screen bg-[#161924] flex flex-col font-menlo">
-      {/* Header */}
-      <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
-        <Link href="/poc">
-          <Image
-            src="/logo_text.svg"
-            alt="Orbit"
-            width={80}
-            height={27}
-            className="opacity-90 mr-auto"
-          />
-        </Link>
-        <Link
-          href="/poc/trellis"
-          className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-        >
-          Try Trellis 3D Generator →
-        </Link>
-        <Link
-          href="/poc/magic-pencil"
-          className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-        >
-          Try Magic Pencil ✨ →
-        </Link>
-      </div>
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col max-w-7xl px-16 mx-auto w-full py-16">
+        {/* Navigation */}
+        <div className="mb-8 flex items-center justify-end gap-4">
+          <Link
+            href="/poc/trellis"
+            className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+          >
+            Try Trellis 3D Generator →
+          </Link>
+          <Link
+            href="/poc/magic-pencil"
+            className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+          >
+            Try Magic Pencil ✨ →
+          </Link>
+        </div>
+
         {/* Title */}
         <h1 className="text-5xl font-light text-white mb-2">
           Generate DIY Storyboard

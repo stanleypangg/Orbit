@@ -22,7 +22,7 @@ export default function PresetCard({
           height={18}
         />
       </div>
-      <p className="font-menlo font-normal text-neutral-100 text-[17px] text-center tracking-wider leading-[20px] mt-8 px-8">
+      <p className="font-menlo font-normal text-neutral-100 text-[17px] text-center tracking-widest leading-[20px] mt-8 px-8">
         {title}
         <br />
         {description}

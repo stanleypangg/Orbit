@@ -87,37 +87,41 @@ const productData = {
 export default function ProductDetail() {
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
-      {/* Header */}
-      <div className="p-4 bg-[#1E2433] border-b border-[#2A3142] flex items-center gap-4">
-        <Image
-          src="/logo_text.svg"
-          alt="Orbit"
-          width={80}
-          height={27}
-          className="opacity-90 mr-auto"
-        />
-        <Link
-          href="/poc"
-          className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-        >
-          ← Back to Chat
-        </Link>
-        <Link
-          href="/poc/trellis"
-          className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-        >
-          Try Trellis 3D Generator →
-        </Link>
-        <Link
-          href="/poc/magic-pencil"
-          className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-        >
-          Try Magic Pencil ✨ →
-        </Link>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-8">
+        {/* Logo and Navigation */}
+        <div className="mb-8 flex items-center justify-between">
+          <Link href="/poc">
+            <Image
+              src="/logo_text.svg"
+              alt="Orbit"
+              width={80}
+              height={27}
+              className="opacity-90 cursor-pointer"
+            />
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/poc"
+              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+            >
+              ← Back to Chat
+            </Link>
+            <Link
+              href="/poc/trellis"
+              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+            >
+              Try Trellis 3D Generator →
+            </Link>
+            <Link
+              href="/poc/magic-pencil"
+              className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+            >
+              Try Magic Pencil ✨ →
+            </Link>
+          </div>
+        </div>
+
         {/* Product Header */}
         <div className="mb-8">
           <h1 className="text-4xl text-white mb-2">{productData.name}</h1>
