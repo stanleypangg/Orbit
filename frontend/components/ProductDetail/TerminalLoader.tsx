@@ -178,7 +178,7 @@ export default function TerminalLoader({ isLoading, hasESGData, has3DModel, hasT
   return (
     <div 
       className={`fixed inset-0 bg-[#161924] z-50 flex items-center justify-center font-mono overflow-hidden transition-opacity duration-500 ${
-        isExiting ? 'opacity-0' : 'opacity-100'
+        isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       onTransitionEnd={() => {
         if (isExiting) {

@@ -8,6 +8,7 @@ export default function Home() {
   const router = useRouter();
   const [animationPhase, setAnimationPhase] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const glowingVideoRef = useRef<HTMLVideoElement>(null);
   const [videoPlayState, setVideoPlayState] = useState<"first" | "looping">(
     "first"
   );
@@ -42,29 +43,48 @@ export default function Home() {
     };
   }, [videoPlayState]);
 
+  // Handle glowing video animation sequence
+  useEffect(() => {
+    const glowingVideo = glowingVideoRef.current;
+    if (!glowingVideo || animationPhase !== 2) return;
+
+    // Pause video immediately on first frame
+    glowingVideo.pause();
+
+    // Phase 3: Start glow effect (immediately)
+    setAnimationPhase(3);
+
+    // After 2 seconds, start zoom
+    const zoomTimeout = setTimeout(() => {
+      setAnimationPhase(4);
+    }, 2000);
+
+    // After zoom completes (2s zoom + 2s pause = 4s total), fade to /poc bg
+    const fadeTimeout = setTimeout(() => {
+      setAnimationPhase(5);
+    }, 4000);
+
+    // Navigate to /poc after fade
+    const navTimeout = setTimeout(() => {
+      router.push("/poc");
+    }, 4500);
+
+    return () => {
+      clearTimeout(zoomTimeout);
+      clearTimeout(fadeTimeout);
+      clearTimeout(navTimeout);
+    };
+  }, [animationPhase, router]);
+
   const handleClick = () => {
     // Phase 1: Fade out landing content (0-600ms)
     setAnimationPhase(1);
 
     setTimeout(() => {
-      // Phase 2: Show MacBook fitted to screen (600ms)
+      // Phase 2: Show glowing.mp4 fullscreen (600ms)
       setAnimationPhase(2);
+      // Video will play and trigger phase 3 when it ends
     }, 600);
-
-    setTimeout(() => {
-      // Phase 3: Start zooming into MacBook (800-3300ms)
-      setAnimationPhase(3);
-    }, 800);
-
-    setTimeout(() => {
-      // Phase 4: Fade out (3300-3800ms)
-      setAnimationPhase(4);
-    }, 3300);
-
-    setTimeout(() => {
-      // Phase 5: Navigate to /poc (3800ms)
-      router.push("/poc");
-    }, 3800);
   };
 
   return (
@@ -119,46 +139,61 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MacBook animation */}
+      {/* Glowing video animation */}
       {animationPhase >= 2 && (
         <div
-          className="fixed inset-0 z-20 flex items-center justify-center bg-[#0F1922]"
+          className="fixed inset-0 z-20 bg-[#0F1922] flex items-center justify-center"
           style={{
-            opacity: animationPhase >= 4 ? 0 : 1,
-            transition: animationPhase >= 4 ? "opacity 500ms ease-out" : "none",
+            opacity: animationPhase === 2 ? 0 : animationPhase >= 5 ? 0 : 1,
+            transition:
+              animationPhase === 2
+                ? "none"
+                : animationPhase === 3
+                ? "opacity 600ms ease-out"
+                : animationPhase >= 5
+                ? "opacity 500ms ease-out"
+                : "none",
           }}
         >
           <div
-            className="relative w-screen h-screen flex items-center justify-center"
+            className="relative w-screen h-screen overflow-hidden flex items-center justify-center"
             style={{
-              transform: animationPhase >= 3 ? "scale(6)" : "scale(1)",
+              transform: animationPhase >= 4 ? "scale(8)" : "scale(1)",
               transition:
-                animationPhase >= 3
-                  ? "transform 2.5s cubic-bezier(0.65, 0, 0.35, 1)"
+                animationPhase >= 4
+                  ? "transform 2s cubic-bezier(0.65, 0, 0.35, 1)"
                   : "none",
             }}
           >
-            <Image
-              src="/greenbook.png"
-              alt="MacBook"
-              width={1920}
-              height={1200}
-              className="max-w-full max-h-full w-auto h-auto object-contain"
-              priority
-            />
-
-            {/* Loading spinner in the laptop screen */}
-            <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2">
-              <div
-                className="w-16 h-16 border-4 border-[#4ade80] border-t-transparent rounded-full animate-spin"
-                style={{
-                  opacity: animationPhase >= 3 ? 1 : 0,
-                  transition: "opacity 300ms ease-in",
-                }}
-              />
-            </div>
+            <video
+              ref={glowingVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              style={{
+                filter:
+                  animationPhase >= 3 && animationPhase < 4
+                    ? "drop-shadow(0 0 80px rgba(103, 182, 139, 0.8)) drop-shadow(0 0 120px rgba(74, 222, 128, 0.6))"
+                    : "none",
+                transition: "filter 800ms ease-out",
+              }}
+            >
+              <source src="/glowing.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
+      )}
+
+      {/* /poc background color transition layer */}
+      {animationPhase >= 5 && (
+        <div
+          className="fixed inset-0 z-30 bg-[#161924]"
+          style={{
+            opacity: animationPhase >= 5 ? 1 : 0,
+            transition: "opacity 500ms ease-out",
+          }}
+        />
       )}
 
       {/* Ambient glow effect */}

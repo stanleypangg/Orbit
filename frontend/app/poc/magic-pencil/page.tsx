@@ -26,10 +26,10 @@ function MagicPencilPageContent() {
     searchParams.get("imageUrl") ||
     searchParams.get("image") ||
     "/pikachu.webp";
-  
+
   // IMPORTANT: Convert backend URLs to proxied URLs for caching + CORS
   const imageUrl = getProxiedImageUrl(rawImageUrl);
-  
+
   const projectTitle = searchParams.get("title") || "Your Project";
   const threadId = searchParams.get("threadId");
   const conceptId = searchParams.get("conceptId");
@@ -65,6 +65,14 @@ function MagicPencilPageContent() {
     null
   );
 
+  // Fade-in animation state
+  const [pageLoaded, setPageLoaded] = useState(false);
+
+  // Trigger fade-in on mount
+  useEffect(() => {
+    setPageLoaded(true);
+  }, []);
+
   // Initialize canvas when image is uploaded
   useEffect(() => {
     if (uploadedImage && canvasRef.current) {
@@ -72,17 +80,20 @@ function MagicPencilPageContent() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      console.log('[Magic Pencil] Loading image:', uploadedImage.substring(0, 100) + '...');
-      
+      console.log(
+        "[Magic Pencil] Loading image:",
+        uploadedImage.substring(0, 100) + "..."
+      );
+
       const img = new window.Image();
       // No need for CORS when using proxy URL (same-origin)
-      if (!uploadedImage.startsWith('/')) {
+      if (!uploadedImage.startsWith("/")) {
         img.crossOrigin = "anonymous";
       }
       img.src = uploadedImage;
-      
+
       img.onload = () => {
-        console.log('[Magic Pencil] ✓ Image loaded successfully');
+        console.log("[Magic Pencil] ✓ Image loaded successfully");
         canvas.width = img.width;
         canvas.height = img.height;
 
@@ -96,9 +107,12 @@ function MagicPencilPageContent() {
       };
 
       img.onerror = (e) => {
-        console.error('[Magic Pencil] ❌ Failed to load image');
-        console.error('[Magic Pencil] Error details:', e);
-        console.error('[Magic Pencil] Is proxied?', uploadedImage.startsWith('/api/images/'));
+        console.error("[Magic Pencil] ❌ Failed to load image");
+        console.error("[Magic Pencil] Error details:", e);
+        console.error(
+          "[Magic Pencil] Is proxied?",
+          uploadedImage.startsWith("/api/images/")
+        );
       };
     }
   }, [uploadedImage]);
@@ -294,7 +308,7 @@ function MagicPencilPageContent() {
       // instead of always using the original uploadedImage
       const canvas = canvasRef.current;
       let processedImageUrl: string;
-      
+
       if (canvas) {
         // Get the current canvas content (includes edits if any)
         processedImageUrl = canvas.toDataURL("image/png");
@@ -302,7 +316,7 @@ function MagicPencilPageContent() {
       } else {
         // Fallback to original if canvas not available
         processedImageUrl = uploadedImage;
-        
+
         // If it's a proxy URL (starts with /api/), fetch the actual image
         if (uploadedImage.startsWith("/api/images/")) {
           const imgResponse = await fetch(uploadedImage);
@@ -317,9 +331,11 @@ function MagicPencilPageContent() {
       }
 
       console.log("[Trellis] Generating 3D model...");
-      
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate`,
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        }/trellis/generate`,
         {
           method: "POST",
           headers: {
@@ -350,24 +366,28 @@ function MagicPencilPageContent() {
       }
 
       const data = await response.json();
-      
+
       if (data.model_file) {
         console.log("[Trellis] ✓ 3D model generated:", data.model_file);
-        
+
         // Store the CURRENT canvas image (with edits) for product page
-        const finalImage = canvas ? canvas.toDataURL("image/png") : uploadedImage;
+        const finalImage = canvas
+          ? canvas.toDataURL("image/png")
+          : uploadedImage;
         const imageHash = btoa(finalImage.substring(0, 100));
         localStorage.setItem("productImage", finalImage);
         localStorage.setItem(`model_${imageHash}`, data.model_file);
-        
+
         // Navigate to product page with threadId for polling
         const params = new URLSearchParams();
-        if (threadId) params.set('thread', threadId);
+        if (threadId) params.set("thread", threadId);
         window.location.href = `/product?${params.toString()}`;
       }
     } catch (error) {
       console.error("[Trellis] ❌ Error generating 3D model:", error);
-      alert(error instanceof Error ? error.message : "Failed to generate 3D model");
+      alert(
+        error instanceof Error ? error.message : "Failed to generate 3D model"
+      );
     } finally {
       setIsGenerating3D(false);
     }
@@ -450,14 +470,9 @@ function MagicPencilPageContent() {
         setIsGenerating(false);
         setPrompt("");
 
-        // After generation completes, navigate to product page with the final edited image
+        // Store the generated image for when user clicks Continue
         const canvasDataUrl = canvas.toDataURL("image/png");
         localStorage.setItem("productImage", canvasDataUrl);
-        
-        // Include threadId for potential background 3D generation polling
-        const params = new URLSearchParams();
-        if (threadId) params.set('thread', threadId);
-        window.location.href = `/product?${params.toString()}`;
       };
 
       img.onerror = () => {
@@ -473,7 +488,12 @@ function MagicPencilPageContent() {
   };
 
   return (
-    <div className="h-screen pt-12 bg-[#161924] flex flex-col font-menlo overflow-hidden">
+    <div
+      className="h-screen pt-12 bg-[#161924] flex flex-col font-menlo overflow-hidden transition-opacity duration-1000"
+      style={{
+        opacity: pageLoaded ? 1 : 0,
+      }}
+    >
       {/* Main Content */}
       <div className="flex-1 flex flex-col pt-4 max-w-7xl mx-auto w-full px-8">
         <div className="w-full max-w-full">
@@ -564,7 +584,7 @@ function MagicPencilPageContent() {
                         tool === "pencil"
                           ? "translate-y-8"
                           : "translate-y-14 hover:translate-y-12"
-                      }`} 
+                      }`}
                       title="Pencil"
                     >
                       <Image
@@ -685,10 +705,10 @@ function MagicPencilPageContent() {
                     if (canvas) {
                       const canvasDataUrl = canvas.toDataURL("image/png");
                       localStorage.setItem("productImage", canvasDataUrl);
-                      
+
                       // Include threadId for Trellis polling
                       const params = new URLSearchParams();
-                      if (threadId) params.set('thread', threadId);
+                      if (threadId) params.set("thread", threadId);
                       window.location.href = `/product?${params.toString()}`;
                     }
                   }}
@@ -702,14 +722,6 @@ function MagicPencilPageContent() {
                   className="w-64 py-3 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
                 >
                   {isGenerating ? "Generating..." : "Generate"}
-                </button>
-                
-                <button
-                  onClick={handleGenerate3D}
-                  disabled={isGenerating3D || !uploadedImage}
-                  className="w-64 py-3 bg-[#5BA3D0] hover:bg-[#4a93c0] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold transition-colors uppercase tracking-wide"
-                >
-                  {isGenerating3D ? "Generating 3D..." : "🎲 Generate 3D Model"}
                 </button>
               </div>
             </div>

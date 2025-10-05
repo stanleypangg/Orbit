@@ -74,7 +74,7 @@ export default function ToolsAndMaterialsSection({
         {/* Items Container */}
         <div
           ref={containerRef}
-          className="overflow-hidden px-12"
+          className="overflow-hidden px-12\"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div

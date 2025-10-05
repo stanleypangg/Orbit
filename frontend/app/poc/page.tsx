@@ -105,6 +105,7 @@ export default function Home() {
   const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
   const [isScrolledAway, setIsScrolledAway] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
 
   // Fade-in animation on page load
   useEffect(() => {
@@ -212,13 +213,48 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Detect if user has manually scrolled up
+  const handleMessagesScroll = () => {
+    if (!chatContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } =
+      chatContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
+
+    // Only mark as scrolled if user is NOT at bottom
+    if (!isAtBottom) {
+      setUserHasScrolled(true);
+    } else {
+      setUserHasScrolled(false);
+    }
+  };
+
   useEffect(() => {
     // Only auto-scroll after the initial animation is complete (phase 8+)
-    // This prevents the page from scrolling during the chat mode transition
-    if (animationPhase >= 8) {
-      scrollToBottom();
+    // and if user hasn't manually scrolled up
+    if (animationPhase >= 8 && !userHasScrolled) {
+      // Use requestAnimationFrame to ensure DOM has fully updated
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollToBottom();
+        }, 50);
+      });
     }
-  }, [messages, animationPhase]);
+  }, [messages, animationPhase, userHasScrolled]);
+
+  // Force scroll to bottom when new messages arrive (even if user scrolled)
+  // This ensures immediate visibility of new chat bubbles
+  useEffect(() => {
+    if (animationPhase >= 8 && messages.length > 0) {
+      // Always scroll on new messages, but respect userHasScrolled for subsequent updates
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && !userHasScrolled) {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }
+    }
+  }, [messages.length, animationPhase]);
 
   // Prevent body scroll during chat mode transition animation
   useEffect(() => {
@@ -703,7 +739,8 @@ export default function Home() {
           {/* Messages Area - Expands when in focus mode */}
           <div
             ref={chatContainerRef}
-            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto relative transition-all duration-500 ease-out"
+            onScroll={handleMessagesScroll}
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar relative transition-all duration-500 ease-out"
             style={{
               height: isConceptFocusMode ? "calc(100vh - 180px)" : "calc(100vh - 280px)",
             }}
@@ -1200,9 +1237,9 @@ export default function Home() {
         }}
       >
         {/* Title */}
-        <div className="overflow-hidden text-center">
+        <div className="overflow-hidden text-center mt-12">
           <h1
-            className="text-5xl text-white mb-2 font-semibold transition-all duration-500 ease-out font-mono"
+            className="text-5xl text-white mb-4 font-semibold transition-all duration-500 ease-out font-mono"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
@@ -1211,37 +1248,6 @@ export default function Home() {
           >
             What Do You Want To Make?
           </h1>
-          <pre className="text-[#67B68B] text-[8px] leading-[0.6] mb-2 font-mono opacity-60">
-            {`                 ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                               
-             ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
-          ↓↙↙↓↙↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
-        ↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙        ↓↙↙↓↙↙↓↙↓↙↓↙↙                       
-      ↙↓↙↓↙↓↙↓↙↓↙↓↙                  ↓↙↓↙↓↙↓↙↓↓                     
-     ↓↙↓↙↓↙↙↓↙↓↙                        ↙↓↙↓↙↙↙↓↓                   
-   ↙↓↙↓↙↓↙↓↙↓↙                            ↓↙↓↓↙↙↓↙                  
-  ↓↙↓↙↙↓↙↓↙↓↙                               ↙↓↙↓↙↓↙           ↙↓↙↙  
- ↓↙↓↙↓↙↓↙↙↓                                  ↙↓↙↓↙↓↓     ↓↓↙↓↙↙     
- ↙↓↙↓↙↓↙↓↓↙                                   ↙↓↙↓   ↙↓↙↓↙↙         
-↓↙↓↙↙↓↙↓↙↓                                      ↓↙↓↙↓↙↓             
-↓↙↓↙↓↙↓↙↓↙                                 ↙↓↙↓↙↙↓↙↓↓               
-↓↙↓↙↓↙↙↓↙↓↙                    ↙↙↓     ↓↓↙↓↙↓↙↓↙↓↙↓↙↙↓              
-↙↓↙↓↙↓↙↓↙↓↙↓↙↓        ↙↙↓↓↙↓↙↓↓↙    ↙↓↙↙↓↙↓↓↙  ↓↙↓↙↓↙↓              
-↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙↓↙↙↙   ↓↙↓↙↓↙↓↙↓      ↙↓↙↓↙↓↙              
- ↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓     ↓↙↓↙↓↙↓↙↓↙       ↙↓↙↓↙↓↙↓              
-   ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙       ↙↓↙↙↓↙↙↓↙↓↙          ↓↙↓↙↓↙↓               
-                       ↓↙↓↙↓↙↓↙↓↙↓           ↙↓↙↙↓↙↓↙               
-                    ↙↓↙↓↙↓↙↓↙↓↓             ↓↙↓↙↓↙↓↙↓               
-                  ↓↙↓↙↓↙↓↙↓↙↓             ↓↙↙↓↙↓↙↓↙↓                
-                ↓↙↓↙↓↙↙↓↙↓↙             ↙↓↙↓↙↓↙↙↓↙↓                 
-              ↓↙↓↙↙↓↙↓↙↓↙↓            ↓↙↓↙↓↙↓↙↓↙↓↙                  
-             ↙↓↙↙↓↙↓↙↓↙↓↙↙↙      ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                   
-            ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                    
-           ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                     
-           ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙                       
-            ↓↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
-              ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
-                 ↓↓↙↓↙↓↙↓↙↓↙↙↓↙↓↙↓↙↓`}
-          </pre>
           <h2 className="text-[#67B68B] mb-4 font-mono text-3xl">
             Turn Waste into Products
           </h2>

@@ -81,9 +81,9 @@ export default function ProductDetail() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [packageData, setPackageData] = useState<ProductPackage | null>(null);
-  const [isLoadingPackage, setIsLoadingPackage] = useState(true); // Start true
-  const [showLoader, setShowLoader] = useState(false); // Only show after delay
-  const [loaderMounted, setLoaderMounted] = useState(false); // Track if loader was ever needed
+  const [isLoadingPackage, setIsLoadingPackage] = useState(true);
+  const [showLoader, setShowLoader] = useState(true); // Show loader immediately
+  const [loaderMounted, setLoaderMounted] = useState(true); // Mount loader from start
 
   // Get image from localStorage on mount
   useEffect(() => {
@@ -102,22 +102,13 @@ export default function ProductDetail() {
       if (!threadId) {
         console.log("[Product Page] No thread ID, skipping package fetch");
         setIsLoadingPackage(false);
+        setShowLoader(false); // Hide loader immediately if no thread
         return;
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const packageUrl = `${apiUrl}/api/package/package/${threadId}`;
       console.log("[Product Page] Fetching package from:", packageUrl);
-      
-      // Track if we should show loader (will be cancelled if data arrives quickly)
-      let shouldShowLoader = true;
-      const loaderTimeout = setTimeout(() => {
-        if (shouldShowLoader) {  // Only show if NOT cancelled
-          console.log("[Product Page] ⏱️ Data taking >500ms, showing loader...");
-          setLoaderMounted(true);
-          setShowLoader(true);
-        }
-      }, 500);
       
       try {
         const response = await fetch(packageUrl);
@@ -148,15 +139,11 @@ export default function ProductDetail() {
         }
         
         setPackageData(data);
-        shouldShowLoader = false; // Cancel loader mount if data arrived quickly
-        clearTimeout(loaderTimeout);
         setIsLoadingPackage(false);
-        setShowLoader(false); // Hide loader animation immediately when data arrives
-        console.log("[Product Page] ✓ Package loaded, loader mounted:", loaderMounted);
+        setShowLoader(false); // Hide loader when data arrives
+        console.log("[Product Page] ✓ Package loaded successfully");
       } catch (err) {
         console.error("[Product Page] Error loading package data:", err);
-        shouldShowLoader = false;
-        clearTimeout(loaderTimeout);
         setIsLoadingPackage(false);
         setShowLoader(false);
       }
@@ -352,7 +339,7 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
-      {/* Terminal Loading Screen - only mount if data takes >500ms */}
+      {/* Terminal Loading Screen - shown immediately on mount */}
       {loaderMounted && (
         <TerminalLoader 
           isLoading={showLoader}
@@ -363,8 +350,9 @@ export default function ProductDetail() {
         />
       )}
       
-      {/* Main Content */}
-      <div className="max-w-[1440px] mx-auto p-8">
+      {/* Main Content - only show when loader is not active */}
+      {!showLoader && (
+        <div className="max-w-[1440px] mx-auto p-8">
         {/* Product Header */}
         <div className="mb-8">
           <h1 className="text-4xl text-white mb-2">{projectName}</h1>
@@ -770,6 +758,7 @@ export default function ProductDetail() {
           <Storyboard steps={steps} />
         </div>
       </div>
+      )}
     </div>
   );
 }
