@@ -508,7 +508,7 @@ function MagicPencilPageContent() {
                     max="100"
                     value={brushSize}
                     onChange={(e) => setBrushSize(Number(e.target.value))}
-                    className="w-full h-1 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-1 appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #67B68B 0%, #67B68B ${
                         ((brushSize - 10) / 90) * 100
