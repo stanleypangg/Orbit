@@ -283,76 +283,251 @@ export default function ProductDetail() {
             />
           </div>
           
-          {/* ESG Impact - Split into Graph + Metrics - Stretches to match 3D viewer height */}
+          {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
-            {/* Top: Graph - Takes remaining space after square cards */}
-            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6 overflow-auto">
-              <h3 className="text-[#67B68B] text-lg font-semibold mb-4">Environmental Impact</h3>
+            {/* Top: Overall Score + Breakdown - Dynamic height */}
+            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded overflow-hidden flex flex-col">
+              {/* Overall ESG Score - Hero Section */}
+              <div className="bg-gradient-to-b from-[#161924] to-[#2A3038] border-b-[0.5px] border-[#67B68B]/30 p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">Overall Rating</div>
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-[#67B68B] animate-pulse" />
+                    <div className="w-2 h-2 bg-[#67B68B] animate-pulse" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-2 h-2 bg-[#67B68B] animate-pulse" style={{ animationDelay: '0.4s' }} />
+                  </div>
+                </div>
+                
+                <div className="flex items-end gap-4">
+                  <div className="flex items-baseline">
+                    <span className="text-6xl font-bold text-[#67B68B] font-mono leading-none">97</span>
+                    <span className="text-2xl text-gray-500 font-mono ml-1">/100</span>
+                  </div>
+                  
+                  <div className="flex-1 mb-2">
+                    <div className="text-xs text-gray-400 font-mono mb-2">ESG IMPACT SCORE</div>
+                    <div className="h-3 bg-[#161924] rounded-full overflow-hidden border border-[#67B68B]/20">
+                      <div 
+                        className="h-full bg-gradient-to-r from-[#67B68B] via-[#5BA3D0] to-[#4ade80] relative"
+                        style={{ width: '97%' }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-[9px] text-gray-600 font-mono mt-1">
+                      <span>POOR</span>
+                      <span>FAIR</span>
+                      <span>GOOD</span>
+                      <span className="text-[#67B68B]">EXCELLENT</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 flex items-center gap-2 text-xs">
+                  <div className="px-2 py-1 bg-[#67B68B]/10 border border-[#67B68B]/30 rounded text-[#67B68B] font-mono">
+                    S-RANK
+                  </div>
+                  <div className="text-gray-500 font-mono">→</div>
+                  <div className="text-gray-400 font-mono">Exceptional sustainability metrics</div>
+                </div>
+              </div>
               
-              {/* Simple Bar Chart */}
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">CO₂ Avoided</span>
-                    <span className="text-[#67B68B]">{productData.esgData.co2EmissionsAvoided} kg</span>
+              {/* Category Breakdown */}
+              <div className="flex-1 p-6 overflow-auto">
+                <div className="text-xs text-gray-500 font-mono uppercase tracking-wider mb-4">Stat Breakdown</div>
+                <div className="space-y-4">
+                {/* Carbon Impact Score */}
+                <div className="bg-[#161924]/50 border border-[#67B68B]/30 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 border border-[#67B68B] flex items-center justify-center text-[#67B68B] text-xs font-mono">&gt;</div>
+                      <span className="text-xs text-gray-300 font-semibold">Carbon Impact</span>
+                    </div>
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-xl font-bold text-[#67B68B] font-mono">98</span>
+                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-[#161924] h-3 rounded overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#67B68B] to-[#4ade80] rounded"
-                      style={{ width: `${(productData.esgData.co2EmissionsAvoided / 0.1) * 100}%` }}
-                    />
+                  
+                  {/* Score breakdown */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">EMISSIONS:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '98%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">98</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">ENERGY:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '95%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">95</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">TRANSPORT:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#67B68B]" style={{ width: '100%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#67B68B] font-mono w-8 text-right">100</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-[#67B68B]/10">
+                    <p className="text-[9px] text-gray-500 font-mono">
+                      <span className="text-[#67B68B]">{productData.esgData.co2EmissionsAvoided} kg</span> CO₂e saved vs. 2.5kg baseline
+                    </p>
                   </div>
                 </div>
-                
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Water Saved</span>
-                    <span className="text-[#67B68B]">{productData.esgData.waterSaved} L</span>
+
+                {/* Water Conservation Score */}
+                <div className="bg-[#161924]/50 border border-[#5BA3D0]/30 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 border border-[#5BA3D0] flex items-center justify-center text-[#5BA3D0] text-xs font-mono">~</div>
+                      <span className="text-xs text-gray-300 font-semibold">Water Conservation</span>
+                    </div>
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-xl font-bold text-[#5BA3D0] font-mono">99</span>
+                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-[#161924] h-3 rounded overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#5BA3D0] to-[#4ade80] rounded"
-                      style={{ width: `${(productData.esgData.waterSaved / 0.08) * 100}%` }}
-                    />
+                  
+                  {/* Score breakdown */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">USAGE:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '99%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">99</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">POLLUTION:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '100%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">100</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">TREATMENT:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: '98%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#5BA3D0] font-mono w-8 text-right">98</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-[#5BA3D0]/10">
+                    <p className="text-[9px] text-gray-500 font-mono">
+                      <span className="text-[#5BA3D0]">{productData.esgData.waterSaved} L</span> saved; no chemical treatment
+                    </p>
                   </div>
                 </div>
-                
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Sustainability Score</span>
-                    <span className="text-[#67B68B]">{productData.esgData.sustainabilityScore}/100</span>
+
+                {/* Circularity Score */}
+                <div className="bg-[#161924]/50 border border-[#4ade80]/30 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 border border-[#4ade80] flex items-center justify-center text-[#4ade80] text-xs font-mono">↻</div>
+                      <span className="text-xs text-gray-300 font-semibold">Circularity</span>
+                    </div>
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-xl font-bold text-[#4ade80] font-mono">{productData.esgData.sustainabilityScore}</span>
+                      <span className="text-[10px] text-gray-500 font-mono">/100</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-[#161924] h-3 rounded overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#67B68B] to-[#4ade80] rounded"
-                      style={{ width: `${productData.esgData.sustainabilityScore}%` }}
-                    />
+                  
+                  {/* Score breakdown */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">REUSE:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '100%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">100</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">LONGEVITY:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '95%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">95</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-500 font-mono w-24">END-OF-LIFE:</span>
+                      <div className="flex-1 h-1 bg-[#161924] rounded overflow-hidden">
+                        <div className="h-full bg-[#4ade80]" style={{ width: '93%' }} />
+                      </div>
+                      <span className="text-[9px] text-[#4ade80] font-mono w-8 text-right">93</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-[#4ade80]/10">
+                    <p className="text-[9px] text-gray-500 font-mono">
+                      <span className="text-[#4ade80]">100% reclaimed</span> materials; fully recyclable
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
+            </div>
             
-            {/* Bottom: Metrics Cards - Square */}
+            {/* Bottom: Quick Stats - Square Video Game Tiles */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-4 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold text-[#67B68B] mb-1">
-                  {productData.esgData.co2EmissionsAvoided}
+              {/* Carbon Stat */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#67B68B]/20 transition-all">
+                {/* Corner decorations */}
+                <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B]" />
+                <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B]" />
+                <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#67B68B]" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#67B68B]" />
+                
+                <div className="relative h-full flex flex-col items-center justify-center p-4">
+                  <div className="text-[10px] text-[#67B68B]/60 font-mono uppercase tracking-widest mb-2">CARBON</div>
+                  <div className="text-4xl font-bold text-[#67B68B] mb-1 font-mono">
+                    {productData.esgData.co2EmissionsAvoided}
+                  </div>
+                  <div className="text-[10px] text-gray-400 font-mono mb-2">kg CO₂</div>
+                  <div className="text-[8px] text-gray-600 font-mono uppercase">AVOIDED</div>
                 </div>
-                <div className="text-xs text-gray-400 text-center">kg CO₂ Avoided</div>
               </div>
               
-              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#5BA3D0] rounded p-4 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold text-[#5BA3D0] mb-1">
-                  {productData.esgData.waterSaved}
+              {/* Water Stat */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#5BA3D0] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#5BA3D0]/20 transition-all">
+                {/* Corner decorations */}
+                <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#5BA3D0]" />
+                <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#5BA3D0]" />
+                <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#5BA3D0]" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#5BA3D0]" />
+                
+                <div className="relative h-full flex flex-col items-center justify-center p-4">
+                  <div className="text-[10px] text-[#5BA3D0]/60 font-mono uppercase tracking-widest mb-2">WATER</div>
+                  <div className="text-4xl font-bold text-[#5BA3D0] mb-1 font-mono">
+                    {productData.esgData.waterSaved}
+                  </div>
+                  <div className="text-[10px] text-gray-400 font-mono mb-2">Liters</div>
+                  <div className="text-[8px] text-gray-600 font-mono uppercase">CONSERVED</div>
                 </div>
-                <div className="text-xs text-gray-400 text-center">Liters Water Saved</div>
               </div>
               
-              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#4ade80] rounded p-4 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold text-[#4ade80] mb-1">
-                  {productData.esgData.sustainabilityScore}
+              {/* Circularity Stat */}
+              <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#4ade80] rounded relative overflow-hidden group hover:shadow-lg hover:shadow-[#4ade80]/20 transition-all">
+                {/* Corner decorations */}
+                <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#4ade80]" />
+                <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#4ade80]" />
+                <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#4ade80]" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#4ade80]" />
+                
+                <div className="relative h-full flex flex-col items-center justify-center p-4">
+                  <div className="text-[10px] text-[#4ade80]/60 font-mono uppercase tracking-widest mb-2">CIRCULAR</div>
+                  <div className="text-4xl font-bold text-[#4ade80] mb-1 font-mono">
+                    {productData.esgData.sustainabilityScore}
+                  </div>
+                  <div className="text-[10px] text-gray-400 font-mono mb-2">Score</div>
+                  <div className="text-[8px] text-gray-600 font-mono uppercase">RATING</div>
                 </div>
-                <div className="text-xs text-gray-400 text-center">Sustainability Score</div>
               </div>
             </div>
           </div>
