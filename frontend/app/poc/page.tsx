@@ -833,22 +833,6 @@ export default function Home() {
                             ))}
                           </div>
                         </div>
-
-                        {/* Missing Information - Show when there are questions */}
-                        {message.clarifyingQuestions &&
-                          message.clarifyingQuestions.length > 0 &&
-                          message.ingredients && (
-                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 p-4 mt-2">
-                              <h3 className="text-yellow-400 text-lg font-semibold mb-2 font-mono">
-                                ⚠️ Missing Information
-                              </h3>
-                              <p className="text-yellow-200 text-sm font-mono">
-                                {getFieldFromQuestion(
-                                  message.clarifyingQuestions[0]
-                                )}
-                              </p>
-                            </div>
-                          )}
                       </div>
                     )}
 
