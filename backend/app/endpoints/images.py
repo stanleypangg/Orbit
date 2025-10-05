@@ -110,6 +110,19 @@ def create_placeholder_image(style: str, title: str, width: int = 512, height: i
     return img_byte_arr
 
 
+@router.options("/{image_id}")
+async def options_image(image_id: str):
+    """Handle CORS preflight for image requests"""
+    from fastapi.responses import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
 @router.get("/{image_id}")
 async def get_image(image_id: str):
     """
@@ -118,6 +131,7 @@ async def get_image(image_id: str):
     - Adds HTTP caching headers (1 hour)
     - Compresses to WebP for smaller size
     - Falls back to filesystem cache
+    - CORS enabled for canvas usage
     """
     try:
         # Check filesystem cache first (FAST!)
@@ -130,6 +144,8 @@ async def get_image(image_id: str):
                 headers={
                     "Cache-Control": CACHE_CONTROL_HEADER,
                     "ETag": f'"{image_id}"',
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
                 }
             )
         
@@ -163,6 +179,8 @@ async def get_image(image_id: str):
                 headers={
                     "Cache-Control": CACHE_CONTROL_HEADER,
                     "ETag": f'"{image_id}"',
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
                 }
             )
         
@@ -189,6 +207,8 @@ async def get_image(image_id: str):
                 headers={
                     "Cache-Control": CACHE_CONTROL_HEADER,
                     "ETag": f'"{image_id}"',
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
                 }
             )
     

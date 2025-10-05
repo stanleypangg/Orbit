@@ -122,12 +122,15 @@ export function useWorkflow({
               'IMG_generation': '🖼️ Generating concept images...',
             };
             
+            // KEEP existing loading state during transitions to prevent flickering
             setState(prev => ({
               ...prev,
               currentNode: currentNode,
               phase: mapBackendPhaseToUI(data.data.current_phase),
-              isLoading: true,
-              loadingMessage: loadingMessages[currentNode] || '⚙️ Processing...',
+              // Preserve loading state if already loading (e.g., during P1c→G1 transition)
+              isLoading: prev.isLoading !== false ? true : true,
+              // Keep existing message if we have one, otherwise use node-specific message
+              loadingMessage: prev.loadingMessage || loadingMessages[currentNode] || '⚙️ Processing...',
             }));
             if (onPhaseChange && data.data.current_phase) {
               onPhaseChange(data.data.current_phase);
@@ -147,8 +150,10 @@ export function useWorkflow({
                 confidence: ing.confidence || 0.8,
               })),
               phase: 'ingredient_discovery',
-              // DON'T clear loading state here - keep it active until we reach a stopping point
-              // (user_question, choices_generated, etc.)
+              // KEEP loading state active during P1b→P1c transition after clarification
+              // Only clear when we reach an actual stopping point (user_question, choices_generated)
+              isLoading: prev.isLoading,  // Preserve loading state
+              loadingMessage: prev.loadingMessage,  // Preserve loading message
             }));
             break;
 
@@ -160,7 +165,7 @@ export function useWorkflow({
               ...prev,
               question: firstQuestion,
               needsInput: true,
-              isLoading: false,
+              isLoading: false,  // Only clear loading when we actually get a new question
               loadingMessage: null,
             }));
             break;
@@ -395,12 +400,14 @@ export function useWorkflow({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // The SSE stream will handle updates
+      // Keep loading state - SSE stream will update when workflow actually progresses
+      // Don't clear isLoading here - wait for next phase/state from backend
     } catch (error: any) {
       setState(prev => ({
         ...prev,
         error: error.message || 'Failed to resume workflow',
         phase: 'error',
+        isLoading: false,
       }));
     }
   }, [apiUrl, state.threadId]);

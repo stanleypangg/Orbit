@@ -4,6 +4,7 @@ Handles progressive ingredient discovery with interrupt/resume patterns.
 """
 import asyncio
 import uuid
+import logging
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, Response
@@ -14,6 +15,7 @@ import time
 from app.workflows.graph import workflow_orchestrator
 from app.core.redis import redis_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
 # Use the global orchestrator instance
