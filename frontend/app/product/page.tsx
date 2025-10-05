@@ -419,10 +419,10 @@ export default function ProductDetail() {
                 <div className="relative aspect-square w-full max-w-xs mx-auto">
                   <svg viewBox="0 0 200 200" className="w-full h-full">
                     {/* Grid circles */}
-                    <circle cx="100" cy="100" r="80" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
-                    <circle cx="100" cy="100" r="60" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
-                    <circle cx="100" cy="100" r="40" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
-                    <circle cx="100" cy="100" r="20" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="115" r="80" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="115" r="60" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="115" r="40" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
+                    <circle cx="100" cy="115" r="20" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
                     
                     {/* Axes */}
                     <line x1="100" y1="100" x2="100" y2="32.4" stroke="#67B68B" strokeWidth="0.5" opacity="0.2" />
@@ -454,7 +454,7 @@ export default function ProductDetail() {
                   </svg>
                   
                   {/* Labels */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2">
                     <div className="text-xs text-[#67B68B] font-mono text-center">
                       {carbonScore !== undefined ? (
                         <div className="font-bold">{carbonScore}</div>
@@ -464,7 +464,7 @@ export default function ProductDetail() {
                       <div className="text-[10px] text-gray-400">CARBON</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 right-0 translate-x-2 translate-y-6">
+                  <div className="absolute bottom-0 right-0 translate-x-2">
                     <div className="text-xs text-[#5BA3D0] font-mono text-center">
                       {waterScore !== undefined ? (
                         <div className="font-bold">{waterScore}</div>
@@ -474,7 +474,7 @@ export default function ProductDetail() {
                       <div className="text-[10px] text-gray-400">WATER</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 -translate-x-2 translate-y-6">
+                  <div className="absolute bottom-0 left-0 -translate-x-2">
                     <div className="text-xs text-[#4ade80] font-mono text-center">
                       {circularScore !== undefined ? (
                         <div className="font-bold">{circularScore}</div>
