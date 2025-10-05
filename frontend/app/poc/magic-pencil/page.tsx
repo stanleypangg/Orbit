@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 
 interface Point {
   x: number;
@@ -14,7 +15,11 @@ interface HistoryState {
 }
 
 export default function MagicPencilPage() {
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const imageFromQuery = searchParams.get("image") || "/pikachu.webp";
+  const [uploadedImage, setUploadedImage] = useState<string | null>(
+    imageFromQuery
+  );
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<"pencil" | "eraser">("pencil");
   const [showPrompt, setShowPrompt] = useState(false);
@@ -28,7 +33,6 @@ export default function MagicPencilPage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const brushSize = 30;
 
@@ -97,19 +101,6 @@ export default function MagicPencilPage() {
     const state = history[index];
     ctx.putImageData(state.imageData, 0, 0);
     setUploadedImage(state.baseImage); // Restore the base image for this state
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setUploadedImage(event.target?.result as string);
-      setHistory([]);
-      setHistoryIndex(-1);
-    };
-    reader.readAsDataURL(file);
   };
 
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -337,27 +328,9 @@ export default function MagicPencilPage() {
             <div
               ref={containerRef}
               className="relative bg-[#2A3038] flex items-center justify-center"
-              style={{ minHeight: "400px", height: "500px" }}
+              style={{ minHeight: "300px", height: "350px" }}
             >
-              {!uploadedImage ? (
-                // Upload State
-                <div className="text-center">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-8 py-4 bg-[#67B68B] hover:bg-[#3bc970] text-black font-semibold rounded-lg transition-colors tracking-wide"
-                  >
-                    Upload Image
-                  </button>
-                </div>
-              ) : (
-                // Canvas State
+              {uploadedImage && (
                 <canvas
                   ref={canvasRef}
                   onMouseDown={startDrawing}
@@ -465,7 +438,7 @@ export default function MagicPencilPage() {
                   {isGenerating ? "Generating..." : "Generate"}
                 </button>
                 <button className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide">
-                  Skip
+                  Continue
                 </button>
               </div>
             </div>

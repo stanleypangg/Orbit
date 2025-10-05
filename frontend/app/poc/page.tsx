@@ -39,8 +39,12 @@ export default function Home() {
     setPageLoaded(true);
   }, []);
 
-  const { state: workflowState, startWorkflow, resumeWorkflow } = useWorkflow({
-    apiUrl: 'http://localhost:8000',
+  const {
+    state: workflowState,
+    startWorkflow,
+    resumeWorkflow,
+  } = useWorkflow({
+    apiUrl: "http://localhost:8000",
   });
 
   const presets = [
@@ -175,13 +179,18 @@ export default function Home() {
 
   // Handle workflow state changes
   useEffect(() => {
-    if (workflowState.phase === 'ingredient_discovery' && workflowState.ingredients.length > 0) {
+    if (
+      workflowState.phase === "ingredient_discovery" &&
+      workflowState.ingredients.length > 0
+    ) {
       // Update messages with ingredient data
       const assistantId = `assistant-${Date.now()}`;
-      const hasNewIngredients = !messages.some(m => m.ingredients && m.ingredients.length > 0);
-      
+      const hasNewIngredients = !messages.some(
+        (m) => m.ingredients && m.ingredients.length > 0
+      );
+
       if (hasNewIngredients) {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
@@ -189,23 +198,25 @@ export default function Home() {
             id: assistantId,
             ingredients: workflowState.ingredients,
             needsClarification: workflowState.needsInput,
-            clarifyingQuestions: workflowState.question ? [workflowState.question] : [],
+            clarifyingQuestions: workflowState.question
+              ? [workflowState.question]
+              : [],
           },
         ]);
-        setAnimatedMessageIds(prev => new Set([...prev, assistantId]));
+        setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
         setExtractedIngredients(workflowState.ingredients);
       }
     }
 
     if (workflowState.needsInput && workflowState.question) {
       // Add clarification question to messages if not already present
-      const hasQuestion = messages.some(m => 
+      const hasQuestion = messages.some((m) =>
         m.clarifyingQuestions?.includes(workflowState.question!)
       );
-      
+
       if (!hasQuestion) {
         const questionId = `question-${Date.now()}`;
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
@@ -214,13 +225,13 @@ export default function Home() {
             needsClarification: true,
           },
         ]);
-        setAnimatedMessageIds(prev => new Set([...prev, questionId]));
+        setAnimatedMessageIds((prev) => new Set([...prev, questionId]));
       }
     }
 
     if (workflowState.error) {
       const errorId = `error-${Date.now()}`;
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
@@ -228,7 +239,7 @@ export default function Home() {
           id: errorId,
         },
       ]);
-      setAnimatedMessageIds(prev => new Set([...prev, errorId]));
+      setAnimatedMessageIds((prev) => new Set([...prev, errorId]));
       setIsGenerating(false);
     }
   }, [workflowState, messages, setExtractedIngredients, setIsGenerating]);
@@ -275,7 +286,7 @@ export default function Home() {
 
         {/* Chat Container */}
         <div
-          className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8 transition-opacity duration-1000"
+          className="flex-1 flex flex-col max-w-8xl px-16 mx-auto w-full py-8 transition-opacity duration-1000 relative"
           style={{
             opacity: pageLoaded ? 1 : 0,
           }}
@@ -349,7 +360,9 @@ export default function Home() {
                                         <span>Size: {ingredient.size}</span>
                                       )}
                                       {ingredient.category && (
-                                        <span>Category: {ingredient.category}</span>
+                                        <span>
+                                          Category: {ingredient.category}
+                                        </span>
                                       )}
                                     </div>
                                   </div>
@@ -371,20 +384,27 @@ export default function Home() {
                         </div>
 
                         {/* Clarifying Questions */}
-                        {message.needsClarification && message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
-                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
-                            <h3 className="text-yellow-400 text-lg font-semibold mb-2">
-                              ❓ Need More Information
-                            </h3>
-                            <ul className="space-y-2">
-                              {message.clarifyingQuestions.map((question, idx) => (
-                                <li key={idx} className="text-yellow-200 text-sm">
-                                  • {question}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                        {message.needsClarification &&
+                          message.clarifyingQuestions &&
+                          message.clarifyingQuestions.length > 0 && (
+                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
+                              <h3 className="text-yellow-400 text-lg font-semibold mb-2">
+                                ❓ Need More Information
+                              </h3>
+                              <ul className="space-y-2">
+                                {message.clarifyingQuestions.map(
+                                  (question, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-yellow-200 text-sm"
+                                    >
+                                      • {question}
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -435,6 +455,29 @@ export default function Home() {
               </button>
             </div>
           </div>
+
+          {/* Placeholder button for Magic Pencil */}
+          <Link
+            href={{
+              pathname: "/poc/magic-pencil",
+              query: { image: "/pikachu.webp" },
+            }}
+            className="fixed bottom-8 right-8 z-50"
+          >
+            <button className="bg-[#4ade80] hover:bg-[#3bc970] text-black font-semibold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 hover:scale-105">
+              <span>✨</span>
+              <span>Magic Pencil</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-5 h-5"
+              >
+                <path d="M21.731 2.269a2.625 2.625 0 00-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 000-3.712zM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 00-1.32 2.214l-.8 2.685a.75.75 0 00.933.933l2.685-.8a5.25 5.25 0 002.214-1.32l8.4-8.4z" />
+                <path d="M5.25 5.25a3 3 0 00-3 3v10.5a3 3 0 003 3h10.5a3 3 0 003-3V13.5a.75.75 0 00-1.5 0v5.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5V8.25a1.5 1.5 0 011.5-1.5h5.25a.75.75 0 000-1.5H5.25z" />
+              </svg>
+            </button>
+          </Link>
         </div>
       </div>
     );
