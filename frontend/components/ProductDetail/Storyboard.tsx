@@ -23,9 +23,9 @@ export default function Storyboard({ steps }: StoryboardProps) {
       </h3>
 
       {/* Step Display */}
-      <div className="border-[0.5px] border-[#67B68B] p-6 mb-6 min-h-[400px] flex items-center gap-6">
+      <div className="border-[0.5px] border-[#67B68B] p-6 mb-6 min-h-[400px] flex max-w-5xl items-center gap-6 mx-auto">
         {/* Step Image */}
-        <div className="w-1/2 bg-[#2A3142] border-[0.5px] border-[#67B68B] aspect-video relative flex items-center justify-center">
+        <div className="w-1/2 bg-[#2A3142] aspect-video relative flex items-center justify-center">
           {steps[currentStep].image ? (
             <Image
               src={steps[currentStep].image}

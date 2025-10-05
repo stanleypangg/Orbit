@@ -34,7 +34,21 @@ export default function MagicPencilPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const brushSize = 30;
+  const brushColors = [
+    "#E91E63", // Pink
+    "#B8975A", // Gold/Yellow
+    "#67B68B", // Green
+    "#5BA3D0", // Blue
+    "#9B59B6", // Purple
+  ];
+
+  const [brushColor, setBrushColor] = useState(brushColors[2]); // Default green
+  const [brushSize, setBrushSize] = useState(30);
+
+  // Custom cursor position
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
 
   // Initialize canvas when image is uploaded
   useEffect(() => {
@@ -172,8 +186,14 @@ export default function MagicPencilPage() {
     ctx.lineJoin = "round";
 
     if (tool === "pencil") {
-      ctx.strokeStyle = "rgba(76, 222, 128, 0.5)";
-      ctx.fillStyle = "rgba(76, 222, 128, 0.5)";
+      // Convert hex color to rgba with opacity
+      const r = parseInt(brushColor.slice(1, 3), 16);
+      const g = parseInt(brushColor.slice(3, 5), 16);
+      const b = parseInt(brushColor.slice(5, 7), 16);
+      const colorWithOpacity = `rgba(${r}, ${g}, ${b}, 0.7)`;
+
+      ctx.strokeStyle = colorWithOpacity;
+      ctx.fillStyle = colorWithOpacity;
       ctx.globalCompositeOperation = "source-over";
     } else {
       ctx.globalCompositeOperation = "destination-out";
@@ -197,6 +217,16 @@ export default function MagicPencilPage() {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Update cursor position relative to container
+    const container = containerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      setCursorPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    }
+
     if (!isDrawing || !lastPoint) return;
 
     const coords = getCanvasCoordinates(e);
@@ -207,6 +237,17 @@ export default function MagicPencilPage() {
 
     // Update last point
     setLastPoint(coords);
+  };
+
+  const handleMouseEnter = () => {
+    // Show cursor
+  };
+
+  const handleMouseLeave = () => {
+    setCursorPos(null);
+    if (isDrawing) {
+      stopDrawing();
+    }
   };
 
   const handleGenerate = async () => {
@@ -298,8 +339,8 @@ export default function MagicPencilPage() {
   return (
     <div className="h-screen bg-[#161924] flex flex-col font-menlo overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center pt-8">
-        <div className="w-full max-w-6xl px-8">
+      <div className="flex-1 flex flex-col pt-8 max-w-7xl mx-auto w-full">
+        <div className="w-full max-w-full">
           {/* Title */}
           <h1 className="text-4xl font-light tracking-wider text-white mb-2">
             Adjust your Design
@@ -309,164 +350,297 @@ export default function MagicPencilPage() {
           </p>
 
           {/* Main Canvas Area */}
-          <div className="border-[#67B68B] border-[0.45px] bg-[#2A3038] p-8">
-            {/* Instruction */}
-            <div className="flex pl-22 pt-10 items-center gap-8 text-[#67B68B] text-lg bg-[#2A3038] p-3 -mx-8 -mt-8 mb-6">
+          <div className="border-[#67B68B] border-[0.45px] bg-[#2A3038]">
+            {/* Tooltip Block - Full Width at Top */}
+            <div className="flex items-center gap-4 px-8 py-4 text-[#67B68B] text-sm border-b border-[#67B68B]/20">
               <Image
                 src="/edit/tooltip.svg"
                 alt="Info"
                 width={16}
                 height={16}
               />
-              <span className="tracking-wider">
+              <span className="tracking-wide">
                 Use pencil to mark, undo marks with the eraser, and type your
                 change description on notepad
               </span>
             </div>
 
-            {/* Canvas Container */}
-            <div
-              ref={containerRef}
-              className="relative bg-[#2A3038] flex items-center justify-center"
-              style={{ minHeight: "300px", height: "350px" }}
-            >
-              {uploadedImage && (
-                <canvas
-                  ref={canvasRef}
-                  onMouseDown={startDrawing}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  onMouseMove={handleMouseMove}
-                  className="max-w-full max-h-full cursor-crosshair"
-                  style={{
-                    imageRendering: "crisp-edges",
-                  }}
-                />
-              )}
-            </div>
+            <div className="relative p-8">
+              {/* Tools Component - Compact Top Left */}
+              <div className="absolute top-8 left-8 z-10 w-48 border-[0.5px] border-[#67B68B] bg-[#2A3038] p-4">
+                <h3 className="text-white text-xs font-normal mb-4">Tools</h3>
 
-            {/* Tools Bar - Always visible */}
-            <div className="mt-6 bg-[#2D3642] border border-[#67B68B] px-6 py-5 flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                {/* Undo/Redo */}
-                <div className="flex">
-                  <button
-                    onClick={undo}
-                    disabled={!uploadedImage || historyIndex <= 0}
-                    className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Image
-                      src="/edit/undo.svg"
-                      alt="Undo"
-                      width={24}
-                      height={24}
-                    />
-                  </button>
-                  <button
-                    onClick={redo}
-                    disabled={
-                      !uploadedImage || historyIndex >= history.length - 1
-                    }
-                    className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Image
-                      src="/edit/redo.svg"
-                      alt="Redo"
-                      width={24}
-                      height={24}
-                    />
-                  </button>
+                {/* Brush Size */}
+                <div className="mb-4">
+                  <label className="text-white text-[10px] font-normal mb-2 block">
+                    Brush Size
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={brushSize}
+                    onChange={(e) => setBrushSize(Number(e.target.value))}
+                    className="w-full h-1 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #67B68B 0%, #67B68B ${
+                        ((brushSize - 10) / 90) * 100
+                      }%, #4A5568 ${
+                        ((brushSize - 10) / 90) * 100
+                      }%, #4A5568 100%)`,
+                    }}
+                  />
                 </div>
 
-                {/* Tools */}
-                <div className="flex gap-4">
+                {/* Brush Colour */}
+                <div className="mb-4">
+                  <label className="text-white text-[10px] font-normal mb-2 block">
+                    Brush Colour
+                  </label>
+                  <div className="flex gap-1.5">
+                    {brushColors.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setBrushColor(color)}
+                        className={`w-6 h-6 rounded-full border transition-all ${
+                          brushColor === color
+                            ? "border-white scale-110"
+                            : "border-transparent hover:border-gray-400"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tool Icons */}
+                <div className="flex gap-2">
                   <button
                     onClick={() => setTool("pencil")}
                     disabled={!uploadedImage}
-                    className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                      tool === "pencil" ? "" : "hover:bg-[#454D5A]"
+                    className={`flex-1 h-16 flex items-center justify-center transition-all disabled:opacity-30 border border-[#67B68B]/30 ${
+                      tool === "pencil"
+                        ? "bg-[#67B68B]/20"
+                        : "hover:bg-[#67B68B]/10"
                     }`}
+                    title="Pencil"
                   >
                     <Image
                       src="/edit/pencil.png"
                       alt="Pencil"
-                      width={100}
-                      height={100}
-                      className="max-w-[100px] max-h-[100px] w-auto h-auto"
+                      width={40}
+                      height={40}
+                      className="w-auto h-auto max-w-[40px] max-h-[40px]"
                     />
                   </button>
                   <button
                     onClick={() => setTool("eraser")}
                     disabled={!uploadedImage}
-                    className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                      tool === "eraser" ? "" : "hover:bg-[#454D5A]"
+                    className={`flex-1 h-16 flex items-center justify-center transition-all disabled:opacity-30 border border-[#67B68B]/30 ${
+                      tool === "eraser"
+                        ? "bg-[#67B68B]/20"
+                        : "hover:bg-[#67B68B]/10"
                     }`}
+                    title="Eraser"
                   >
                     <Image
                       src="/edit/eraser.png"
                       alt="Eraser"
-                      width={100}
-                      height={100}
-                      className="max-w-[100px] max-h-[100px] w-auto h-auto"
-                    />
-                  </button>
-                  <button
-                    onClick={() => setShowPrompt(!showPrompt)}
-                    disabled={!uploadedImage}
-                    className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                      showPrompt ? "" : "hover:bg-[#454D5A]"
-                    }`}
-                  >
-                    <Image
-                      src="/edit/note.png"
-                      alt="Note"
-                      width={100}
-                      height={100}
-                      className="max-w-[100px] max-h-[100px] w-auto h-auto"
+                      width={40}
+                      height={40}
+                      className="w-auto h-auto max-w-[40px] max-h-[40px]"
                     />
                   </button>
                 </div>
               </div>
 
-              {/* Generate & Skip Buttons */}
-              <div className="flex flex-col gap-2 items-center">
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !showPrompt || !prompt.trim()}
-                  className="w-[400px] py-4 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
-                >
-                  {isGenerating ? "Generating..." : "Generate"}
-                </button>
-                <button
-                  onClick={() => {
-                    // Store image in localStorage to pass to product page
-                    if (uploadedImage) {
-                      localStorage.setItem("productImage", uploadedImage);
-                    }
-                    window.location.href = "/product";
-                  }}
-                  className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
-                >
-                  Continue
-                </button>
+              {/* Canvas Container */}
+              <div
+                ref={containerRef}
+                className="relative bg-[#2A3038] flex items-center justify-center"
+                style={{ minHeight: "300px", height: "350px" }}
+              >
+                {uploadedImage && (
+                  <>
+                    <canvas
+                      ref={canvasRef}
+                      onMouseDown={startDrawing}
+                      onMouseUp={stopDrawing}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                      onMouseMove={handleMouseMove}
+                      className="max-w-full max-h-full cursor-none"
+                      style={{
+                        imageRendering: "crisp-edges",
+                      }}
+                    />
+                    {/* Custom Cursor */}
+                    {cursorPos && (
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${cursorPos.x}px`,
+                          top: `${cursorPos.y}px`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        {/* Outer circle showing brush size */}
+                        <div
+                          className="absolute rounded-full border-2"
+                          style={{
+                            width: `${brushSize}px`,
+                            height: `${brushSize}px`,
+                            transform: "translate(-50%, -50%)",
+                            borderColor:
+                              tool === "pencil" ? brushColor : "#FF6B6B",
+                            backgroundColor:
+                              tool === "pencil"
+                                ? `${brushColor}20`
+                                : "#FF6B6B20",
+                            transition: "width 0.1s ease, height 0.1s ease",
+                          }}
+                        />
+                        {/* Center dot for precision */}
+                        <div
+                          className="absolute w-1 h-1 rounded-full"
+                          style={{
+                            backgroundColor:
+                              tool === "pencil" ? brushColor : "#FF6B6B",
+                            transform: "translate(-50%, -50%)",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            </div>
 
-            {/* Prompt Input */}
-            {showPrompt && uploadedImage && (
-              <div className="mt-4 p-4 border border-[#67B68B] rounded-lg bg-[#1E2433]">
-                <label className="block text-[#67B68B] text-sm mb-2 tracking-wide">
-                  Describe your changes
-                </label>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Type what you want to change in the marked areas..."
-                  className="w-full bg-[#232937] text-white border border-[#2A3142] rounded p-3 h-24 resize-none focus:outline-none focus:border-[#67B68B] transition-colors placeholder:text-gray-500"
-                />
+              {/* Tools Bar - Always visible */}
+              <div className="mt-6 bg-[#2D3642] border border-[#67B68B] px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  {/* Undo/Redo */}
+                  <div className="flex">
+                    <button
+                      onClick={undo}
+                      disabled={!uploadedImage || historyIndex <= 0}
+                      className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Image
+                        src="/edit/undo.svg"
+                        alt="Undo"
+                        width={24}
+                        height={24}
+                      />
+                    </button>
+                    <button
+                      onClick={redo}
+                      disabled={
+                        !uploadedImage || historyIndex >= history.length - 1
+                      }
+                      className="w-[100px] h-[100px] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Image
+                        src="/edit/redo.svg"
+                        alt="Redo"
+                        width={24}
+                        height={24}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Tools */}
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setTool("pencil")}
+                      disabled={!uploadedImage}
+                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                        tool === "pencil" ? "" : "hover:bg-[#454D5A]"
+                      }`}
+                    >
+                      <Image
+                        src="/edit/pencil.png"
+                        alt="Pencil"
+                        width={100}
+                        height={100}
+                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
+                      />
+                    </button>
+                    <button
+                      onClick={() => setTool("eraser")}
+                      disabled={!uploadedImage}
+                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                        tool === "eraser" ? "" : "hover:bg-[#454D5A]"
+                      }`}
+                    >
+                      <Image
+                        src="/edit/eraser.png"
+                        alt="Eraser"
+                        width={100}
+                        height={100}
+                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
+                      />
+                    </button>
+                    <button
+                      onClick={() => setShowPrompt(!showPrompt)}
+                      disabled={!uploadedImage}
+                      className={`w-[90px] h-[90px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                        showPrompt ? "" : "hover:bg-[#454D5A]"
+                      }`}
+                    >
+                      <Image
+                        src="/edit/note.png"
+                        alt="Note"
+                        width={100}
+                        height={100}
+                        className="max-w-[100px] max-h-[100px] w-auto h-auto"
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Generate & Skip Buttons */}
+                <div className="flex flex-col gap-2 items-center">
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !showPrompt || !prompt.trim()}
+                    className="w-[400px] py-4 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
+                  >
+                    {isGenerating ? "Generating..." : "Generate"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Store image in localStorage to pass to product page
+                      if (uploadedImage) {
+                        localStorage.setItem("productImage", uploadedImage);
+                      }
+                      window.location.href = "/product";
+                    }}
+                    className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
-            )}
+
+              {/* Prompt Input */}
+              {showPrompt && uploadedImage && (
+                <div className="mt-6 border-[0.5px] border-[#67B68B] bg-[#2A3344] p-6">
+                  <label className="block text-[#67B68B] text-sm mb-4 tracking-wide font-normal">
+                    Describe your Change
+                  </label>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Type what you want to change..."
+                    className="w-full bg-[#3A4354] text-white text-sm border-none p-4 h-20 resize-none focus:outline-none placeholder:text-gray-500 placeholder:text-sm"
+                  />
+                </div>
+              )}
+            </div>
+            {/* End relative container */}
           </div>
+          {/* End Main Canvas Area */}
         </div>
       </div>
     </div>
