@@ -425,13 +425,13 @@ export default function ProductDetail() {
                     <circle cx="100" cy="100" r="20" fill="none" stroke="#67B68B" strokeWidth="0.5" opacity="0.1" />
                     
                     {/* Axes */}
-                    <line x1="100" y1="100" x2="100" y2="20" stroke="#67B68B" strokeWidth="0.5" opacity="0.2" />
-                    <line x1="100" y1="100" x2="169.28" y2="160" stroke="#5BA3D0" strokeWidth="0.5" opacity="0.2" />
-                    <line x1="100" y1="100" x2="30.72" y2="160" stroke="#4ade80" strokeWidth="0.5" opacity="0.2" />
+                    <line x1="100" y1="100" x2="100" y2="32.4" stroke="#67B68B" strokeWidth="0.5" opacity="0.2" />
+                    <line x1="100" y1="100" x2="167.9" y2="167.6" stroke="#5BA3D0" strokeWidth="0.5" opacity="0.2" />
+                    <line x1="100" y1="100" x2="32.1" y2="167.6" stroke="#4ade80" strokeWidth="0.5" opacity="0.2" />
                     
                     {/* Data polygon */}
                     <polygon 
-                      points="100,21.6 167.9,156.8 32.1,156.8"
+                      points="100,32.4 167.9,167.6 32.1,167.6"
                       fill="url(#radarGradient)"
                       stroke="#67B68B"
                       strokeWidth="2"
@@ -439,9 +439,9 @@ export default function ProductDetail() {
                     />
                     
                     {/* Data points */}
-                    <circle cx="100" cy="21.6" r="4" fill="#67B68B" />
-                    <circle cx="167.9" cy="156.8" r="4" fill="#5BA3D0" />
-                    <circle cx="32.1" cy="156.8" r="4" fill="#4ade80" />
+                    <circle cx="100" cy="32.4" r="4" fill="#67B68B" />
+                    <circle cx="167.9" cy="167.6" r="4" fill="#5BA3D0" />
+                    <circle cx="32.1" cy="167.6" r="4" fill="#4ade80" />
                     
                     {/* Gradient definition */}
                     <defs>
@@ -464,7 +464,7 @@ export default function ProductDetail() {
                       <div className="text-[10px] text-gray-400">CARBON</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 right-0 translate-x-4 translate-y-6">
+                  <div className="absolute bottom-0 right-0 translate-x-2 translate-y-6">
                     <div className="text-xs text-[#5BA3D0] font-mono text-center">
                       {waterScore !== undefined ? (
                         <div className="font-bold">{waterScore}</div>
@@ -474,7 +474,7 @@ export default function ProductDetail() {
                       <div className="text-[10px] text-gray-400">WATER</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 -translate-x-4 translate-y-6">
+                  <div className="absolute bottom-0 left-0 -translate-x-2 translate-y-6">
                     <div className="text-xs text-[#4ade80] font-mono text-center">
                       {circularScore !== undefined ? (
                         <div className="font-bold">{circularScore}</div>
