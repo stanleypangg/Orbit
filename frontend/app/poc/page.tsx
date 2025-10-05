@@ -43,6 +43,27 @@ interface Message {
   concepts?: WorkflowConcept[];
 }
 
+// Helper function to extract which field the question is asking about
+const getFieldFromQuestion = (question: string): string => {
+  const lowerQuestion = question.toLowerCase();
+  
+  if (lowerQuestion.includes("size") || lowerQuestion.includes("how big") || lowerQuestion.includes("how large")) {
+    return "size";
+  }
+  if (lowerQuestion.includes("material") || lowerQuestion.includes("made of") || lowerQuestion.includes("what type")) {
+    return "material";
+  }
+  if (lowerQuestion.includes("category") || lowerQuestion.includes("type of item") || lowerQuestion.includes("what kind")) {
+    return "category";
+  }
+  if (lowerQuestion.includes("condition") || lowerQuestion.includes("state") || lowerQuestion.includes("how clean")) {
+    return "condition";
+  }
+  
+  // Default: return empty if can't determine
+  return "information";
+};
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -232,19 +253,35 @@ export default function Home() {
         ]);
         setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
         setExtractedIngredients(workflowState.ingredients);
+      } else if (workflowState.question) {
+        // If ingredients message already exists, update it with the clarifying question
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (
+              msg.ingredients &&
+              msg.ingredients.length > 0 &&
+              (!msg.clarifyingQuestions || msg.clarifyingQuestions.length === 0)
+            ) {
+              return {
+                ...msg,
+                clarifyingQuestions: [workflowState.question!],
+              };
+            }
+            return msg;
+          })
+        );
       }
     }
-  }, [workflowState.phase, workflowState.ingredients.length]); // Only re-run when phase or ingredient count changes
+  }, [workflowState.phase, workflowState.ingredients.length, workflowState.question]); // Also watch for question changes
 
   useEffect(() => {
     if (workflowState.needsInput && workflowState.question) {
       console.log("Workflow needs input, question:", workflowState.question);
       console.log("Current messages:", messages);
 
-      // Add clarification question to messages if not already present
+      // Add clarification question as a separate message
       const hasQuestion = messages.some(
         (m) =>
-          m.clarifyingQuestions?.includes(workflowState.question!) ||
           m.content === workflowState.question ||
           m.content.includes(workflowState.question!)
       );
@@ -255,9 +292,8 @@ export default function Home() {
         const questionId = `question-${Date.now()}`;
         const newMessage = {
           role: "assistant" as const,
-          content: workflowState.question!, // Use the question as the main content
+          content: workflowState.question!, // Show question as a normal message
           id: questionId,
-          clarifyingQuestions: [workflowState.question!],
         };
         console.log("Adding question message:", newMessage);
         setMessages((prev) => [...prev, newMessage]);
@@ -490,10 +526,10 @@ export default function Home() {
                       }`}
                     >
                       <div
-                        className={`max-w-[70%] px-4 py-3 rounded-lg ${
+                        className={`max-w-[70%] px-4 py-3 border-[0.5px] font-mono ${
                           message.role === "user"
-                            ? "bg-[#4ade80] text-black"
-                            : "bg-[#2A3142] text-white"
+                            ? "bg-[#4ade80] text-black border-[#4ade80]"
+                            : "bg-[#2A3142] text-white border-[#67b68b]"
                         }`}
                         style={
                           shouldAnimate
@@ -512,22 +548,22 @@ export default function Home() {
                     {message.ingredients && message.ingredients.length > 0 && (
                       <div className="mt-4 space-y-4">
                         {/* Ingredients Section */}
-                        <div className="bg-[#1a2030] border-[0.5px] border-[#3a4560] rounded-lg p-4">
-                          <h3 className="text-[#4ade80] text-lg font-semibold mb-3">
+                        <div className="bg-[#1a2030] border-[0.5px] border-[#3a4560] p-4">
+                          <h3 className="text-[#4ade80] text-lg font-semibold mb-3 font-mono">
                             📦 Extracted Materials
                           </h3>
                           <div className="space-y-2">
                             {message.ingredients.map((ingredient, idx) => (
                               <div
                                 key={idx}
-                                className="bg-[#232937] rounded p-3 border-[0.5px] border-[#2A3142]"
+                                className="bg-[#232937] p-3 border-[0.5px] border-[#2A3142]"
                               >
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
-                                    <span className="text-white font-medium">
+                                    <span className="text-white font-medium font-mono">
                                       {ingredient.name || "Unknown"}
                                     </span>
-                                    <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3">
+                                    <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3 font-mono">
                                       <span>
                                         Material: {ingredient.material || "N/A"}
                                       </span>
@@ -558,24 +594,15 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Clarifying Questions - Show when there are questions in the array */}
-                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
-                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4 mt-2">
-                            <h3 className="text-yellow-400 text-lg font-semibold mb-2">
-                              ❓ Please Answer
+                        {/* Missing Information - Show when there are questions */}
+                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && message.ingredients && (
+                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 p-4 mt-2">
+                            <h3 className="text-yellow-400 text-lg font-semibold mb-2 font-mono">
+                              ⚠️ Missing Information
                             </h3>
-                            <ul className="space-y-2">
-                              {message.clarifyingQuestions.map(
-                                (question, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="text-yellow-200 text-sm"
-                                  >
-                                    • {question}
-                                  </li>
-                                )
-                              )}
-                            </ul>
+                            <p className="text-yellow-200 text-sm font-mono">
+                              {getFieldFromQuestion(message.clarifyingQuestions[0])}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -602,18 +629,18 @@ export default function Home() {
                                   onClick={() =>
                                     handleOptionSelect(option.option_id)
                                   }
-                                  className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
+                                  className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] p-4 cursor-pointer transition-all hover:scale-[1.02]"
                                   style={{
                                     animation: "fadeIn 0.5s ease-out forwards",
                                   }}
                                 >
                                   <div className="flex items-start justify-between mb-2">
                                     <div>
-                                      <h4 className="text-white font-semibold text-lg">
+                                      <h4 className="text-white font-semibold text-lg font-mono">
                                         {option.title}
                                       </h4>
                                       {option.tagline && (
-                                        <p className="text-[#4ade80] text-sm italic mt-1">
+                                        <p className="text-[#4ade80] text-sm italic mt-1 font-mono">
                                           {option.tagline}
                                         </p>
                                       )}
@@ -633,10 +660,10 @@ export default function Home() {
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-gray-400 text-sm mb-3">
+                                  <p className="text-gray-400 text-sm mb-3 font-mono">
                                     {option.description}
                                   </p>
-                                  <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-2">
+                                  <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-2 font-mono">
                                     {option.estimated_time && (
                                       <span>⏱️ {option.estimated_time}</span>
                                     )}
@@ -659,7 +686,7 @@ export default function Home() {
                                       )}
                                   </div>
                                   {hasDetails && (
-                                    <div className="text-xs text-gray-500 mt-2">
+                                    <div className="text-xs text-gray-500 mt-2 font-mono">
                                       <strong>
                                         {option.construction_steps?.length || 0}{" "}
                                         steps
@@ -688,7 +715,7 @@ export default function Home() {
                               onClick={() =>
                                 handleConceptSelect(concept.concept_id)
                               }
-                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.05]"
+                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] overflow-hidden cursor-pointer transition-all hover:scale-[1.05]"
                               style={{
                                 animation: "fadeIn 0.5s ease-out forwards",
                               }}
@@ -703,11 +730,11 @@ export default function Home() {
                                 </div>
                               )}
                               <div className="p-3">
-                                <h4 className="text-white font-medium text-sm">
+                                <h4 className="text-white font-medium text-sm font-mono">
                                   {concept.title}
                                 </h4>
                                 {concept.description && (
-                                  <p className="text-gray-400 text-xs mt-1">
+                                  <p className="text-gray-400 text-xs mt-1 font-mono">
                                     {concept.description}
                                   </p>
                                 )}
@@ -724,23 +751,23 @@ export default function Home() {
               {/* Loading Indicator */}
               {workflowState.isLoading && (
                 <div className="flex justify-start">
-                  <div className="max-w-[70%] px-4 py-3 rounded-lg bg-[#2A3142] text-white">
+                  <div className="max-w-[70%] px-4 py-3 border-[0.5px] border-[#67b68b] bg-[#2A3142] text-white">
                     <div className="flex items-center gap-3">
                       <div className="flex space-x-1">
                         <div
-                          className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce"
+                          className="w-2 h-2 bg-[#4ade80] animate-bounce"
                           style={{ animationDelay: "0ms" }}
                         ></div>
                         <div
-                          className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce"
+                          className="w-2 h-2 bg-[#4ade80] animate-bounce"
                           style={{ animationDelay: "150ms" }}
                         ></div>
                         <div
-                          className="w-2 h-2 bg-[#4ade80] rounded-full animate-bounce"
+                          className="w-2 h-2 bg-[#4ade80] animate-bounce"
                           style={{ animationDelay: "300ms" }}
                         ></div>
                       </div>
-                      <span className="text-sm text-gray-300">
+                      <span className="text-sm text-gray-300 font-mono">
                         {workflowState.loadingMessage || "Processing..."}
                       </span>
                     </div>
@@ -773,17 +800,21 @@ export default function Home() {
                   }
                 }}
                 placeholder="Continue the conversation..."
-                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo rounded"
+                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
                 rows={2}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!chatInput.trim() || workflowState.isLoading}
-                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase rounded"
+                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
               >
                 {workflowState.isLoading ? (
                   <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                    </div>
                     Processing
                   </span>
                 ) : (
@@ -801,7 +832,7 @@ export default function Home() {
             }}
             className="fixed bottom-8 right-8 z-50"
           >
-            <button className="bg-[#4ade80] hover:bg-[#3bc970] text-black font-semibold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 hover:scale-105">
+            <button className="bg-[#4ade80] hover:bg-[#3bc970] text-black font-semibold px-6 py-3 shadow-lg transition-all duration-300 flex items-center gap-2 hover:scale-105 font-mono">
               <span>✨</span>
               <span>Magic Pencil</span>
               <svg
@@ -856,7 +887,7 @@ export default function Home() {
         {/* Title */}
         <div className="overflow-hidden">
           <h1
-            className="text-3xl text-white mb-2 transition-all duration-500 ease-out"
+            className="text-3xl text-white mb-2 transition-all duration-500 ease-out font-mono"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
@@ -898,7 +929,7 @@ export default function Home() {
                 height: animationPhase >= 4 ? "60vh" : "10rem",
                 transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
-              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-[#B1AFAF]"
+              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-[#B1AFAF] font-mono"
             />
           </div>
         </div>
@@ -916,7 +947,7 @@ export default function Home() {
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim() || isGenerating}
-              className="w-full bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 transition-all duration-300 uppercase text-base"
+              className="w-full bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 transition-all duration-300 uppercase text-base font-mono"
             >
               {isGenerating ? "GENERATING..." : "GENERATE"}
             </button>

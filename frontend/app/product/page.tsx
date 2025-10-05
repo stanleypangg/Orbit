@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ESGImpact from "@/components/ProductDetail/ESGImpact";
 import ModelViewer from "@/components/ProductDetail/ModelViewer";
 import MaterialsCarousel from "@/components/ProductDetail/MaterialsCarousel";
@@ -12,125 +13,74 @@ import ToolsAndMaterialsSection from "@/components/ProductDetail/ToolsAndMateria
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
 
-// Mock data - replace with actual props or API data
-const productData = {
-  name: "Ocean Drop Earring",
-  summary: "Earring crafted entirely from recycled ocean plastic",
-  esgData: {
-    co2EmissionsAvoided: 0.05,
-    waterSaved: 0.04,
-    sustainabilityScore: 96,
-  },
-  toolsAndMaterials: [
-    { 
-      name: "Heat Gun", 
-      category: "tool" as const,
-      purpose: "Shape plastic pieces",
-      is_optional: false,
-      icon_name: "Flame"
-    },
-    { 
-      name: "Wire Cutters", 
-      category: "tool" as const,
-      purpose: "Cut jewelry wire",
-      is_optional: false,
-      icon_name: "Scissors"
-    },
-    { 
-      name: "Pliers", 
-      category: "tool" as const,
-      purpose: "Bend and shape wire",
-      is_optional: false,
-      icon_name: "Wrench"
-    },
-    { 
-      name: "Jewelry Wire", 
-      category: "material" as const,
-      purpose: "Connect components",
-      is_optional: false,
-      icon_name: "Cable"
-    },
-    { 
-      name: "Silver Hooks", 
-      category: "material" as const,
-      purpose: "Earring attachment",
-      is_optional: false,
-      icon_name: "Anchor"
-    },
-  ],
-  materials: [
-    { name: "Ocean Plastic", image: "/turtle.svg" },
-    { name: "Silver Hooks", image: "/glass.svg" },
-    { name: "Heat Gun", image: "/plastic.svg" },
-    { name: "Wire Cutters", image: "/turtle.svg" },
-    { name: "Jewelry Wire", image: "/glass.svg" },
-    { name: "Pliers", image: "/plastic.svg" },
-    { name: "Work Surface", image: "/turtle.svg" },
-  ],
-  steps: [
-    {
-      image: "/landing.png",
-      title: "Attach Weave",
-      description:
-        "Begin by carefully weaving the recycled ocean plastic pieces together. Use the jewelry wire to create a secure connection between each piece. This forms the foundation of your earring structure.",
-    },
-    {
-      image: "/landing.png",
-      title: "Shape the Plastic",
-      description:
-        "Use the heat gun to carefully shape the ocean plastic pieces into the desired earring form. Apply heat gradually and evenly to avoid damaging the material. Work in a well-ventilated area.",
-    },
-    {
-      image: "/landing.png",
-      title: "Attach Hooks",
-      description:
-        "Connect the silver hooks to the shaped plastic using the jewelry wire and wire cutters. Ensure the hooks are securely attached and properly oriented for comfortable wearing.",
-    },
-    {
-      image: "/landing.png",
-      title: "Final Assembly",
-      description:
-        "Complete the assembly by checking all connections and making sure all components are securely attached. Test the earrings gently to ensure structural integrity.",
-    },
-    {
-      image: "/landing.png",
-      title: "Quality Check",
-      description:
-        "Inspect the finished earrings for quality. Check for any sharp edges, loose connections, or imperfections. Make any necessary adjustments before proceeding to the next step.",
-    },
-    {
-      image: "/landing.png",
-      title: "Polish & Finish",
-      description:
-        "Polish the earrings using a soft cloth to bring out the natural shine of the ocean plastic. Add any final decorative touches or protective coatings if desired.",
-    },
-    {
-      image: "/landing.png",
-      title: "Safety Test",
-      description:
-        "Perform a final safety test by gently pulling on all connections. Ensure the earrings are comfortable and safe to wear. Make any last-minute adjustments as needed.",
-    },
-    {
-      image: "/landing.png",
-      title: "Package",
-      description:
-        "Package the earrings in eco-friendly materials ready for use or gifting. Use recycled or biodegradable packaging to maintain the sustainable ethos of your creation.",
-    },
-    {
-      image: "/landing.png",
-      title: "Enjoy Your Creation",
-      description:
-        "Your sustainable ocean drop earrings are now ready to wear! You've successfully transformed ocean waste into a beautiful, wearable piece of art. Share your creation with others to inspire more sustainable crafting.",
-    },
-  ],
-  modelUrl: undefined, // Add actual GLB model URL when available
-};
+interface ESGMetrics {
+  carbon_impact: {
+    emissions_reduction_score: number;
+    energy_efficiency_score: number;
+    transport_impact_score: number;
+    total_co2_avoided_kg: number;
+    rationale: string;
+  };
+  water_conservation: {
+    usage_reduction_score: number;
+    pollution_prevention_score: number;
+    treatment_efficiency_score: number;
+    total_water_saved_liters: number;
+    rationale: string;
+  };
+  material_circularity: {
+    reuse_score: number;
+    longevity_score: number;
+    end_of_life_score: number;
+    circularity_percentage: number;
+    rationale: string;
+  };
+  overall_esg_score: number;
+}
+
+interface ToolOrMaterial {
+  name: string;
+  category: "tool" | "material";
+  purpose: string;
+  is_optional: boolean;
+  icon_name: string;
+}
+
+interface ProductPackage {
+  package_metadata?: {
+    thread_id: string;
+    generated_at: string;
+  };
+  executive_summary?: {
+    project_title: string;
+    tagline: string;
+    description: string;
+  };
+  detailed_esg_metrics?: ESGMetrics;
+  detailed_tools_and_materials?: {
+    tools: ToolOrMaterial[];
+    materials: ToolOrMaterial[];
+  };
+  project_documentation?: {
+    detailed_instructions?: Array<{
+      step_number: number;
+      title: string;
+      description: string;
+      image_url?: string;
+    }>;
+  };
+}
 
 export default function ProductDetail() {
+  const searchParams = useSearchParams();
+  const threadId = searchParams?.get("thread");
+  
   const [imageUrl, setImageUrl] = useState<string>("/pikachu.webp");
   const [modelUrl, setModelUrl] = useState<string | undefined>(undefined);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [packageData, setPackageData] = useState<ProductPackage | null>(null);
+  const [isLoadingPackage, setIsLoadingPackage] = useState(false);
 
   // Get image from localStorage on mount
   useEffect(() => {
@@ -138,12 +88,44 @@ export default function ProductDetail() {
     if (storedImage) {
       console.log("[Product Page] Loading image from storage:", storedImage.substring(0, 50));
       setImageUrl(storedImage);
-      // Don't remove productImage yet - we'll use it as a key for model caching
     } else {
       console.log("[Product Page] No stored image, using default");
     }
   }, []);
 
+  // Fetch product package data from API
+  useEffect(() => {
+    const fetchPackageData = async () => {
+      if (!threadId) {
+        console.log("[Product Page] No thread ID, skipping package fetch");
+        return;
+      }
+
+      setIsLoadingPackage(true);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/package/package/${threadId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch package data");
+        }
+
+        const data = await response.json();
+        console.log("[Product Page] Loaded package data:", data);
+        setPackageData(data);
+      } catch (err) {
+        console.error("[Product Page] Error loading package data:", err);
+        // Don't set error state - just use fallback data
+      } finally {
+        setIsLoadingPackage(false);
+      }
+    };
+
+    fetchPackageData();
+  }, [threadId]);
+
+  // Generate 3D model
   useEffect(() => {
     const generate3DModel = async () => {
       if (!imageUrl) return;
@@ -161,7 +143,6 @@ export default function ProductDetail() {
       }
       
       // Check if there's a background generation in progress (from concept selection)
-      const threadId = new URLSearchParams(window.location.search).get('thread');
       if (threadId) {
         console.log("[Product Page] Checking for background generation...");
         const pollStatus = async () => {
@@ -298,7 +279,66 @@ export default function ProductDetail() {
     };
 
     generate3DModel();
-  }, [imageUrl]);
+  }, [imageUrl, threadId]);
+
+  // Use real data from package or fallback to defaults
+  const projectName = packageData?.executive_summary?.project_title || "Ocean Drop Earring";
+  const projectSummary = packageData?.executive_summary?.tagline || packageData?.executive_summary?.description || "Earring crafted entirely from recycled ocean plastic";
+  
+  const esgMetrics = packageData?.detailed_esg_metrics;
+  const overallScore = esgMetrics?.overall_esg_score || 97;
+  const carbonScore = esgMetrics?.carbon_impact ? Math.round((esgMetrics.carbon_impact.emissions_reduction_score + esgMetrics.carbon_impact.energy_efficiency_score + esgMetrics.carbon_impact.transport_impact_score) / 3) : 98;
+  const waterScore = esgMetrics?.water_conservation ? Math.round((esgMetrics.water_conservation.usage_reduction_score + esgMetrics.water_conservation.pollution_prevention_score + esgMetrics.water_conservation.treatment_efficiency_score) / 3) : 99;
+  const circularScore = esgMetrics?.material_circularity?.circularity_percentage || 96;
+  
+  const co2Avoided = esgMetrics?.carbon_impact?.total_co2_avoided_kg || 0.05;
+  const waterSaved = esgMetrics?.water_conservation?.total_water_saved_liters || 0.04;
+  
+  // Combine tools and materials, ensuring all have icon_name
+  const toolsAndMaterials: ToolOrMaterial[] = [
+    ...(packageData?.detailed_tools_and_materials?.tools || []).map(t => ({
+      ...t,
+      icon_name: t.icon_name || "Wrench"
+    })),
+    ...(packageData?.detailed_tools_and_materials?.materials || []).map(m => ({
+      ...m,
+      icon_name: m.icon_name || "Package"
+    }))
+  ];
+  
+  // Fallback data if no package data loaded
+  const defaultToolsAndMaterials: ToolOrMaterial[] = [
+    { name: "Heat Gun", category: "tool", purpose: "Shape plastic pieces", is_optional: false, icon_name: "Flame" },
+    { name: "Wire Cutters", category: "tool", purpose: "Cut jewelry wire", is_optional: false, icon_name: "Scissors" },
+    { name: "Pliers", category: "tool", purpose: "Bend and shape wire", is_optional: false, icon_name: "Wrench" },
+    { name: "Jewelry Wire", category: "material", purpose: "Connect components", is_optional: false, icon_name: "Cable" },
+    { name: "Silver Hooks", category: "material", purpose: "Earring attachment", is_optional: false, icon_name: "Anchor" },
+  ];
+  
+  const displayToolsAndMaterials = toolsAndMaterials.length > 0 ? toolsAndMaterials : defaultToolsAndMaterials;
+  
+  // Instructions/steps
+  const steps = packageData?.project_documentation?.detailed_instructions?.map((step, idx) => ({
+    image: step.image_url || "/landing.png",
+    title: step.title,
+    description: step.description,
+  })) || [
+    {
+      image: "/landing.png",
+      title: "Attach Weave",
+      description: "Begin by carefully weaving the recycled ocean plastic pieces together. Use the jewelry wire to create a secure connection between each piece. This forms the foundation of your earring structure.",
+    },
+    {
+      image: "/landing.png",
+      title: "Shape the Plastic",
+      description: "Use the heat gun to carefully shape the ocean plastic pieces into the desired earring form. Apply heat gradually and evenly to avoid damaging the material. Work in a well-ventilated area.",
+    },
+    {
+      image: "/landing.png",
+      title: "Final Assembly",
+      description: "Complete the assembly by checking all connections and making sure all components are securely attached. Test the earrings gently to ensure structural integrity.",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
@@ -306,8 +346,11 @@ export default function ProductDetail() {
       <div className="max-w-[1440px] mx-auto p-8">
         {/* Product Header */}
         <div className="mb-8">
-          <h1 className="text-4xl text-white mb-2">{productData.name}</h1>
-          <p className="text-[#67B68B] text-base">{productData.summary}</p>
+          <h1 className="text-4xl text-white mb-2">{projectName}</h1>
+          <p className="text-[#67B68B] text-base">{projectSummary}</p>
+          {isLoadingPackage && (
+            <p className="text-[#B1AFAF] text-sm mt-2">Loading project data...</p>
+          )}
         </div>
 
         {/* Top Section: Model Viewer + ESG Impact Split */}
@@ -345,7 +388,7 @@ export default function ProductDetail() {
                 {/* Overall Score */}
                 <div className="text-center mb-6">
                   <div className="flex items-baseline justify-center gap-1 mb-2">
-                    <span className="text-5xl font-bold text-[#67B68B] font-mono">97</span>
+                    <span className="text-5xl font-bold text-[#67B68B] font-mono">{overallScore}</span>
                     <span className="text-xl text-gray-500 font-mono">/100</span>
                   </div>
                   <div className="px-3 py-1 bg-[#67B68B]/10 border border-[#67B68B]/30 rounded text-[#67B68B] font-mono text-xs inline-block">
@@ -394,19 +437,19 @@ export default function ProductDetail() {
                   {/* Labels */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6">
                     <div className="text-xs text-[#67B68B] font-mono text-center">
-                      <div className="font-bold">98</div>
+                      <div className="font-bold">{carbonScore}</div>
                       <div className="text-[10px] text-gray-400">CARBON</div>
                     </div>
                   </div>
                   <div className="absolute bottom-0 right-0 translate-x-4 translate-y-6">
                     <div className="text-xs text-[#5BA3D0] font-mono text-center">
-                      <div className="font-bold">99</div>
+                      <div className="font-bold">{waterScore}</div>
                       <div className="text-[10px] text-gray-400">WATER</div>
                     </div>
                   </div>
                   <div className="absolute bottom-0 left-0 -translate-x-4 translate-y-6">
                     <div className="text-xs text-[#4ade80] font-mono text-center">
-                      <div className="font-bold">96</div>
+                      <div className="font-bold">{circularScore}</div>
                       <div className="text-[10px] text-gray-400">CIRCULAR</div>
                     </div>
                   </div>
@@ -430,42 +473,42 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#67B68B] flex items-center justify-center text-[#67B68B] text-[10px] font-mono">&gt;</div>
                       <span className="text-[10px] text-[#67B68B] font-mono uppercase">Carbon</span>
                     </div>
-                    <div className="text-xl font-bold text-[#67B68B] font-mono">98</div>
+                    <div className="text-xl font-bold text-[#67B68B] font-mono">{carbonScore}</div>
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>EMISSIONS</span>
-                        <span className="text-[#67B68B]">98</span>
+                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.emissions_reduction_score || 98}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '98%' }} />
+                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.emissions_reduction_score || 98}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>ENERGY</span>
-                        <span className="text-[#67B68B]">95</span>
+                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.energy_efficiency_score || 95}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '95%' }} />
+                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.energy_efficiency_score || 95}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>TRANSPORT</span>
-                        <span className="text-[#67B68B]">100</span>
+                        <span className="text-[#67B68B]">{esgMetrics?.carbon_impact?.transport_impact_score || 100}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#67B68B]" style={{ width: '100%' }} />
+                        <div className="h-full bg-[#67B68B]" style={{ width: `${esgMetrics?.carbon_impact?.transport_impact_score || 100}%` }} />
                       </div>
                     </div>
                   </div>
                   
                   <div className="mt-3 pt-3 border-t border-[#67B68B]/20">
                     <div className="text-[8px] text-gray-500 font-mono">
-                      <span className="text-[#67B68B]">{productData.esgData.co2EmissionsAvoided} kg</span> saved
+                      <span className="text-[#67B68B]">{co2Avoided.toFixed(2)} kg</span> saved
                     </div>
                   </div>
                 </div>
@@ -485,42 +528,42 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#5BA3D0] flex items-center justify-center text-[#5BA3D0] text-[10px] font-mono">~</div>
                       <span className="text-[10px] text-[#5BA3D0] font-mono uppercase">Water</span>
                     </div>
-                    <div className="text-xl font-bold text-[#5BA3D0] font-mono">99</div>
+                    <div className="text-xl font-bold text-[#5BA3D0] font-mono">{waterScore}</div>
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>USAGE</span>
-                        <span className="text-[#5BA3D0]">99</span>
+                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.usage_reduction_score || 99}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '99%' }} />
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.usage_reduction_score || 99}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>POLLUTION</span>
-                        <span className="text-[#5BA3D0]">100</span>
+                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.pollution_prevention_score || 100}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '100%' }} />
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.pollution_prevention_score || 100}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>TREATMENT</span>
-                        <span className="text-[#5BA3D0]">98</span>
+                        <span className="text-[#5BA3D0]">{esgMetrics?.water_conservation?.treatment_efficiency_score || 98}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#5BA3D0]" style={{ width: '98%' }} />
+                        <div className="h-full bg-[#5BA3D0]" style={{ width: `${esgMetrics?.water_conservation?.treatment_efficiency_score || 98}%` }} />
                       </div>
                     </div>
                   </div>
                   
                   <div className="mt-3 pt-3 border-t border-[#5BA3D0]/20">
                     <div className="text-[8px] text-gray-500 font-mono">
-                      <span className="text-[#5BA3D0]">{productData.esgData.waterSaved} L</span> conserved
+                      <span className="text-[#5BA3D0]">{waterSaved.toFixed(2)} L</span> conserved
                     </div>
                   </div>
                 </div>
@@ -540,35 +583,35 @@ export default function ProductDetail() {
                       <div className="w-5 h-5 border border-[#4ade80] flex items-center justify-center text-[#4ade80] text-[10px] font-mono">↻</div>
                       <span className="text-[10px] text-[#4ade80] font-mono uppercase">Circular</span>
                     </div>
-                    <div className="text-xl font-bold text-[#4ade80] font-mono">{productData.esgData.sustainabilityScore}</div>
+                    <div className="text-xl font-bold text-[#4ade80] font-mono">{circularScore}</div>
                   </div>
                   
                   <div className="space-y-2 flex-1">
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>REUSE</span>
-                        <span className="text-[#4ade80]">100</span>
+                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.reuse_score || 100}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '100%' }} />
+                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.reuse_score || 100}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>LONGEVITY</span>
-                        <span className="text-[#4ade80]">95</span>
+                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.longevity_score || 95}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '95%' }} />
+                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.longevity_score || 95}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-[8px] text-gray-400 font-mono mb-1">
                         <span>END-OF-LIFE</span>
-                        <span className="text-[#4ade80]">93</span>
+                        <span className="text-[#4ade80]">{esgMetrics?.material_circularity?.end_of_life_score || 93}</span>
                       </div>
                       <div className="h-1 bg-[#161924] rounded overflow-hidden">
-                        <div className="h-full bg-[#4ade80]" style={{ width: '93%' }} />
+                        <div className="h-full bg-[#4ade80]" style={{ width: `${esgMetrics?.material_circularity?.end_of_life_score || 93}%` }} />
                       </div>
                     </div>
         </div>
@@ -585,11 +628,11 @@ export default function ProductDetail() {
         </div>
 
         {/* Tools & Materials Required */}
-        <ToolsAndMaterialsSection items={productData.toolsAndMaterials} />
+        <ToolsAndMaterialsSection items={displayToolsAndMaterials} />
 
         {/* How to Build Storyboard */}
         <div>
-          <Storyboard steps={productData.steps} />
+          <Storyboard steps={steps} />
         </div>
       </div>
     </div>

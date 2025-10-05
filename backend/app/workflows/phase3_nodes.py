@@ -213,24 +213,24 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
         style_details = style_prompts.get(style_hint.lower(), style_prompts["functional"])
         materials_list = ', '.join(materials[:3]) if materials else "recycled materials"
         
-        # Create detailed hero image prompt with CLEAN BACKGROUND focus
+        # Create detailed hero image prompt optimized for Trellis 3D conversion
         hero_prompt = f"""Professional product photography of {project_title}: {project_description}.
 
 PRODUCT: Crafted from upcycled {materials_list}, showcasing sustainable design and creative reuse. The finished product should be the MAIN and ONLY subject.
 
 STYLE: {style_hint.title()} aesthetic - {style_details['aesthetic']}
 
-BACKGROUND: Clean, minimal, uncluttered background - solid color, soft gradient, or subtle texture ONLY. NO distracting objects, NO props, NO clutter. Keep focus entirely on the product.
+BACKGROUND: Clean, minimal, uncluttered background - solid neutral color, soft gradient, or subtle texture ONLY. NO distracting objects, NO props, NO clutter, NO busy patterns. Keep focus entirely on the product. Minimize background complexity for optimal 3D conversion.
 
-COMPOSITION: {style_details['composition']}, isolated product on clean surface, professional product photography, 8K resolution, ultra-detailed. Product occupies 60-80% of frame.
+COMPOSITION: {style_details['composition']}, product perfectly centered in frame, isolated on clean surface, professional product photography, 8K resolution, ultra-detailed. Product occupies 60-80% of frame, centered with even margins. Show the most representative angle that captures all main features clearly. Front-facing or three-quarter view for optimal 3D reconstruction.
 
-LIGHTING: {style_details['lighting']}, professional studio lighting that highlights the product details. Clean shadows, no harsh contrasts.
+LIGHTING: {style_details['lighting']}, bright, even, professional studio lighting that illuminates all product details uniformly. Well-lit scene with no shadows or dark areas. Excellent contrast between product and background. Soft, diffused lighting to avoid harsh shadows while maintaining high contrast and clarity.
 
 MOOD: {style_details['mood']}, eco-friendly, artisanal craftsmanship. Emphasize the finished product's elegance and simplicity.
 
-QUALITY: Magazine-quality catalog image, commercial product photography, photorealistic rendering, sharp focus on product, soft-focused or solid background, professional color grading.
+QUALITY: Magazine-quality catalog image, commercial product photography, photorealistic rendering, crystal-clear sharp focus on product, high-resolution (8K+), NO blur, NO motion blur, NO depth-of-field blur. Exceptional clarity and detail. High contrast, vibrant colors, professional color grading. Optimized for 3D model conversion.
 
-IMPORTANT: The upcycled product must be completely finished and polished. Show ONLY the final product, not materials or construction process. Clean, minimal setting."""
+IMPORTANT: The upcycled product must be completely finished and polished. Show ONLY the final product, not materials or construction process. Clean, minimal setting. Ensure maximum clarity, sharpness, and detail visibility for 3D reconstruction."""
         
         variant = ConceptVariant(
             style=style_hint,
@@ -1017,7 +1017,15 @@ async def create_final_package(
     try:
         # Get workflow data
         ingredients_data = state_dict.get("ingredients_data", {})
-        ingredients = ingredients_data.get("ingredients", [])
+        
+        # Handle IngredientsData object or dict
+        if hasattr(ingredients_data, 'ingredients'):
+            # It's an IngredientsData Pydantic object
+            ingredients = [ing.model_dump() if hasattr(ing, 'model_dump') else ing for ing in ingredients_data.ingredients]
+        else:
+            # It's a dictionary
+            ingredients = ingredients_data.get("ingredients", [])
+        
         selected_option = state_dict.get("selected_option", {})
         goals = state_dict.get("goals", "")
 

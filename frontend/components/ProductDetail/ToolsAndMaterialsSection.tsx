@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import * as LucideIcons from "lucide-react";
+import { getToolImage } from "@/lib/toolImages";
 
 interface ToolOrMaterial {
   name: string;
@@ -23,12 +23,6 @@ export default function ToolsAndMaterialsSection({
   const containerRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 5;
   const maxIndex = Math.max(0, items.length - itemsPerPage);
-
-  // Helper to get Lucide icon component
-  const getIcon = (iconName: string) => {
-    const IconComponent = (LucideIcons as any)[iconName];
-    return IconComponent || LucideIcons.Wrench; // Fallback to Wrench
-  };
 
   const scrollToIndex = (index: number) => {
     if (!containerRef.current) return;
@@ -60,8 +54,8 @@ export default function ToolsAndMaterialsSection({
   const canGoNext = currentIndex < maxIndex;
 
   return (
-    <div className="mb-8 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6">
-      <h3 className="text-[#67B68B] text-base mb-6 uppercase tracking-wide">
+    <div className="mb-8 bg-[#2A3038] border-[0.5px] border-[#67B68B] p-6">
+      <h3 className="text-[#67B68B] text-base mb-6 uppercase tracking-wide font-menlo">
         Tools & Materials
       </h3>
 
@@ -89,67 +83,82 @@ export default function ToolsAndMaterialsSection({
               width: `${(items.length / itemsPerPage) * 100}%`,
             }}
           >
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="flex flex-col items-center"
-                style={{
-                  minWidth: `${100 / items.length}%`,
-                  flex: `0 0 ${100 / items.length}%`,
-                }}
-              >
-                {/* Square card */}
-                <div className="w-[160px] h-[160px] bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B]/30 rounded hover:border-[#67B68B] transition-all group relative overflow-hidden flex flex-col items-center justify-center p-4">
-                  {/* Corner accents */}
-                  <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
+            {items.map((item, index) => {
+              const toolImage = getToolImage(item.name, item.category);
+              
+              return (
+                <div
+                  key={index}
+                  className="flex flex-col items-center"
+                  style={{
+                    minWidth: `${100 / items.length}%`,
+                    flex: `0 0 ${100 / items.length}%`,
+                  }}
+                >
+                  {/* Square card */}
+                  <div className="w-[160px] h-[160px] bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B]/30 hover:border-[#67B68B] transition-all group relative overflow-hidden flex flex-col items-center justify-center p-4">
+                    {/* Corner accents */}
+                    <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#67B68B] opacity-40 group-hover:opacity-100 transition-opacity" />
 
-                  {/* Icon */}
-                  <div className="w-16 h-16 mb-3 opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    {(() => {
-                      const Icon = getIcon(item.icon_name);
-                      return (
-                        <Icon
-                          size={48}
-                          strokeWidth={2}
-                          className={item.category === "tool" ? "text-[#67B68B]" : "text-[#5BA3D0]"}
+                    {/* Image/Emoji Display */}
+                    <div className="w-20 h-20 mb-3 opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      {toolImage.image ? (
+                        // If we have an image URL, display it
+                        <img
+                          src={toolImage.image}
+                          alt={item.name}
+                          className="w-full h-full object-contain"
+                          style={{
+                            filter: `drop-shadow(0 0 8px ${toolImage.color}40)`,
+                          }}
                         />
-                      );
-                    })()}
-                  </div>
-
-                  {/* Category badge */}
-                  <div
-                    className={`text-[8px] font-mono uppercase tracking-wider mb-2 px-2 py-0.5 rounded ${
-                      item.category === "tool"
-                        ? "bg-[#67B68B]/10 text-[#67B68B] border border-[#67B68B]/30"
-                        : "bg-[#5BA3D0]/10 text-[#5BA3D0] border border-[#5BA3D0]/30"
-                    }`}
-                  >
-                    {item.category}
-                  </div>
-
-                  {/* Name */}
-                  <div className="text-sm font-semibold text-white text-center font-mono">
-                    {item.name}
-                  </div>
-                </div>
-
-                {/* Purpose below card */}
-                <div className="mt-3 text-center">
-                  <div className="text-[11px] text-gray-400 font-mono leading-relaxed max-w-[160px]">
-                    {item.purpose}
-                  </div>
-                  {item.is_optional && (
-                    <div className="mt-1 text-[9px] text-gray-600 font-mono uppercase tracking-wider">
-                      Optional
+                      ) : (
+                        // Otherwise use emoji with styled background
+                        <div 
+                          className="text-6xl relative"
+                          style={{
+                            filter: `drop-shadow(0 0 12px ${toolImage.color}60)`,
+                          }}
+                        >
+                          {toolImage.emoji}
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Category badge */}
+                    <div
+                      className={`text-[8px] font-mono uppercase tracking-wider mb-2 px-2 py-0.5 border-[0.5px] ${
+                        item.category === "tool"
+                          ? "bg-[#67B68B]/10 text-[#67B68B] border-[#67B68B]/30"
+                          : "bg-[#5BA3D0]/10 text-[#5BA3D0] border-[#5BA3D0]/30"
+                      }`}
+                    >
+                      {item.category}
+                    </div>
+
+                    {/* Name */}
+                    <div className="text-sm font-semibold text-white text-center font-mono">
+                      {item.name}
+                    </div>
+                  </div>
+
+                  {/* Purpose below card */}
+                  <div className="mt-3 text-center">
+                    <div className="text-[11px] text-gray-400 font-mono leading-relaxed max-w-[160px]">
+                      {item.purpose}
+                    </div>
+                    {item.is_optional && (
+                      <div className="mt-1 text-[9px] text-gray-600 font-mono uppercase tracking-wider">
+                        Optional
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -168,18 +177,17 @@ export default function ToolsAndMaterialsSection({
       {/* Legend */}
       <div className="mt-6 pt-4 border-t border-[#67B68B]/20 flex items-center gap-6 text-xs font-mono">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-[#67B68B]/20 border border-[#67B68B]/50 rounded" />
+          <div className="w-3 h-3 bg-[#67B68B]/20 border-[0.5px] border-[#67B68B]/50" />
           <span className="text-gray-400">TOOL</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-[#5BA3D0]/20 border border-[#5BA3D0]/50 rounded" />
+          <div className="w-3 h-3 bg-[#5BA3D0]/20 border-[0.5px] border-[#5BA3D0]/50" />
           <span className="text-gray-400">MATERIAL</span>
         </div>
         <div className="ml-auto text-gray-500">
-          → Icons from Lucide library
+          → Visual representations
         </div>
       </div>
     </div>
   );
 }
-

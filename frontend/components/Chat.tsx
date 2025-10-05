@@ -11,13 +11,14 @@ interface ChatProps {
 }
 
 /**
- * Minimal chat UI component with streaming support.
+ * Terminal-style chat UI component with streaming support.
  * Features:
  * - Message list with user/assistant bubbles
  * - Textarea input with Enter to send, Shift+Enter for newline
  * - Loading state and error handling
  * - Auto-scroll as tokens arrive
  * - Accessible with proper ARIA labels
+ * - Monospace font and rigid corners for terminal aesthetic
  */
 export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
   const { messages, input, isStreaming, error, setInput, send, clearError } = useChat({
@@ -54,19 +55,19 @@ export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
+    <div className="flex flex-col h-full max-w-4xl mx-auto bg-[#161924] font-menlo">
       {/* Header */}
-      <div className="flex-none px-6 py-4 border-b border-gray-200">
-        <h1 className="text-2xl font-semibold text-gray-900">Chat</h1>
-        <p className="text-sm text-gray-500 mt-1">Ask me anything</p>
+      <div className="flex-none px-6 py-4 border-b-[0.5px] border-[#67b68b]">
+        <h1 className="text-2xl font-semibold text-white tracking-wider uppercase font-mono">Chat</h1>
+        <p className="text-sm text-[#B1AFAF] mt-1 tracking-wide font-mono">Ask me anything</p>
       </div>
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-12">
-            <p className="text-lg">Start a conversation</p>
-            <p className="text-sm mt-2">Type a message below to begin</p>
+          <div className="text-center text-[#B1AFAF] mt-12">
+            <p className="text-lg tracking-wide font-mono">Start a conversation</p>
+            <p className="text-sm mt-2 tracking-wide font-mono">Type a message below to begin</p>
           </div>
         )}
 
@@ -80,12 +81,12 @@ export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
 
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg max-w-lg">
+            <div className="bg-[#2a3038] border-[0.5px] border-[#ef4444] text-[#ef4444] px-4 py-3 max-w-lg">
               <div className="flex items-start">
-                <span className="text-sm">{error}</span>
+                <span className="text-sm tracking-wide font-mono">{error}</span>
                 <button
                   onClick={clearError}
-                  className="ml-auto pl-3 text-red-500 hover:text-red-700"
+                  className="ml-auto pl-3 text-[#ef4444] hover:text-[#dc2626] transition-colors"
                   aria-label="Dismiss error"
                 >
                   ×
@@ -99,7 +100,7 @@ export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
       </div>
 
       {/* Input area */}
-      <div className="flex-none border-t border-gray-200 px-6 py-4">
+      <div className="flex-none border-t-[0.5px] border-[#67b68b] px-6 py-4">
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <textarea
@@ -109,7 +110,7 @@ export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
               onKeyDown={handleKeyDown}
               disabled={isStreaming}
               placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full bg-[#232937] text-white border-[0.5px] border-[#4ade80] px-4 py-3 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo disabled:bg-[#1a1f2e] disabled:text-[#666] disabled:cursor-not-allowed tracking-wide"
               rows={3}
               aria-label="Chat message input"
             />
@@ -117,20 +118,20 @@ export function Chat({ initialMessages, onSend, systemPrompt }: ChatProps) {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-8 py-3 bg-[#4ade80] text-black font-semibold hover:bg-[#3bc970] focus:outline-none disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider font-mono"
             aria-label="Send message"
           >
             {isStreaming ? (
               <span className="flex items-center gap-2">
                 <Spinner />
-                Sending...
+                Sending
               </span>
             ) : (
               'Send'
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-[#B1AFAF] mt-2 tracking-wide font-mono">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>
@@ -149,22 +150,22 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[70%] rounded-lg px-4 py-3 ${
+        className={`max-w-[70%] px-4 py-3 border-[0.5px] ${
           isUser
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-100 text-gray-900'
+            ? 'bg-[#2a3038] border-[#4ade80] text-white'
+            : 'bg-[#2A3142] border-[#67b68b] text-white'
         }`}
         role="article"
         aria-label={`${message.role} message`}
       >
         {/* Role label */}
-        <div className={`text-xs font-semibold mb-1 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
+        <div className={`text-xs font-semibold mb-1 uppercase tracking-wider font-mono ${isUser ? 'text-[#4ade80]' : 'text-[#67b68b]'}`}>
           {message.role === 'user' ? 'You' : 'Assistant'}
         </div>
 
         {/* Message content */}
         <div
-          className="whitespace-pre-wrap break-words"
+          className="whitespace-pre-wrap break-words tracking-wide font-mono"
           aria-live={isStreaming ? 'polite' : 'off'}
         >
           {message.content || (isStreaming && <Spinner />)}
@@ -176,27 +177,20 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
 
 function Spinner() {
   return (
-    <svg
-      className="animate-spin h-4 w-4 inline-block"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
+    <div className="flex space-x-1">
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "0ms" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "150ms" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "300ms" }}
+      ></div>
+    </div>
   );
 }
 

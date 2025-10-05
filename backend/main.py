@@ -11,6 +11,7 @@ from app.endpoints.workflow.router import router as workflow_router
 from app.endpoints.storyboard import router as storyboard_router
 from app.endpoints.images import router as images_router
 from app.endpoints.step_images import router as step_images_router
+from app.endpoints.package import router as package_router
 import logging
 
 # Configure logging
@@ -43,7 +44,7 @@ app.include_router(workflow_router)
 app.include_router(magic_pencil_router)
 app.include_router(storyboard_router, prefix="/api/storyboard", tags=["storyboard"])
 app.include_router(images_router)
-app.include_router(step_images_router)
+app.include_router(package_router, prefix="/api/package", tags=["package"])
 
 @app.get("/")
 async def root():

@@ -9,12 +9,13 @@ interface Phase1ChatProps {
 }
 
 /**
- * Phase 1 Chat component for material extraction and idea generation.
+ * Phase 1 Chat component for material extraction and idea generation - Terminal style.
  * Features:
  * - Material description input
  * - Ingredient extraction display
  * - Idea cards for user selection
  * - Clarifying questions if needed
+ * - Monospace font and rigid corners for terminal aesthetic
  */
 export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -91,11 +92,11 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto">
+    <div className="flex flex-col h-full max-w-4xl mx-auto bg-[#161924] font-menlo">
       {/* Header */}
-      <div className="flex-none px-6 py-4 border-b border-gray-200">
-        <h1 className="text-2xl font-semibold text-gray-900">Describe Your Materials</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="flex-none px-6 py-4 border-b-[0.5px] border-[#67b68b]">
+        <h1 className="text-2xl font-semibold text-white tracking-wider uppercase font-mono">Describe Your Materials</h1>
+        <p className="text-sm text-[#B1AFAF] mt-1 tracking-wide font-mono">
           Tell me what recyclable materials you have, and I&apos;ll suggest creative upcycling ideas
         </p>
       </div>
@@ -103,9 +104,9 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-12">
-            <p className="text-lg">What materials do you have?</p>
-            <p className="text-sm mt-2">Examples: &quot;3 plastic bottles&quot;, &quot;aluminum cans and cardboard&quot;</p>
+          <div className="text-center text-[#B1AFAF] mt-12">
+            <p className="text-lg tracking-wide font-mono">What materials do you have?</p>
+            <p className="text-sm mt-2 tracking-wide font-mono">Examples: &quot;3 plastic bottles&quot;, &quot;aluminum cans and cardboard&quot;</p>
           </div>
         )}
 
@@ -125,12 +126,12 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
 
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg max-w-lg">
+            <div className="bg-[#2a3038] border-[0.5px] border-[#ef4444] text-[#ef4444] px-4 py-3 max-w-lg">
               <div className="flex items-start">
-                <span className="text-sm">{error}</span>
+                <span className="text-sm tracking-wide font-mono">{error}</span>
                 <button
                   onClick={handleClearError}
-                  className="ml-auto pl-3 text-red-500 hover:text-red-700"
+                  className="ml-auto pl-3 text-[#ef4444] hover:text-[#dc2626] transition-colors"
                   aria-label="Dismiss error"
                 >
                   ×
@@ -144,7 +145,7 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
       </div>
 
       {/* Input area */}
-      <div className="flex-none border-t border-gray-200 px-6 py-4">
+      <div className="flex-none border-t-[0.5px] border-[#67b68b] px-6 py-4">
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <textarea
@@ -154,7 +155,7 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               placeholder="Describe your materials... (e.g., '3 plastic bottles and 5 aluminum cans')"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full bg-[#232937] text-white border-[0.5px] border-[#4ade80] px-4 py-3 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo disabled:bg-[#1a1f2e] disabled:text-[#666] disabled:cursor-not-allowed tracking-wide"
               rows={3}
               aria-label="Materials description input"
             />
@@ -162,20 +163,20 @@ export function Phase1Chat({ onIdeaSelect }: Phase1ChatProps) {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-8 py-3 bg-[#4ade80] text-black font-semibold hover:bg-[#3bc970] focus:outline-none disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors uppercase tracking-wider font-mono"
             aria-label="Analyze materials"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
                 <Spinner />
-                Analyzing...
+                Analyzing
               </span>
             ) : (
               'Analyze'
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-[#B1AFAF] mt-2 tracking-wide font-mono">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>
@@ -194,18 +195,18 @@ function MessageBubble({ message, isLoading }: MessageBubbleProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[70%] rounded-lg px-4 py-3 ${
+        className={`max-w-[70%] px-4 py-3 border-[0.5px] ${
           isUser
-            ? 'bg-green-600 text-white'
-            : 'bg-gray-100 text-gray-900'
+            ? 'bg-[#2a3038] border-[#4ade80] text-white'
+            : 'bg-[#2A3142] border-[#67b68b] text-white'
         }`}
         role="article"
         aria-label={`${message.role} message`}
       >
-        <div className={`text-xs font-semibold mb-1 ${isUser ? 'text-green-100' : 'text-gray-500'}`}>
+        <div className={`text-xs font-semibold mb-1 uppercase tracking-wider font-mono ${isUser ? 'text-[#4ade80]' : 'text-[#67b68b]'}`}>
           {message.role === 'user' ? 'You' : 'Assistant'}
         </div>
-        <div className="whitespace-pre-wrap break-words">
+        <div className="whitespace-pre-wrap break-words tracking-wide font-mono">
           {message.content || (isLoading && <Spinner />)}
         </div>
       </div>
@@ -220,17 +221,17 @@ interface Phase1ResultsProps {
 
 function Phase1Results({ data, onIdeaSelect }: Phase1ResultsProps) {
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-4 space-y-4 font-menlo">
       {/* Ingredients Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">Extracted Materials</h3>
+      <div className="bg-[#2a3038] border-[0.5px] border-[#67b68b] p-4">
+        <h3 className="text-base font-semibold text-[#67b68b] mb-3 uppercase tracking-wide font-mono">Extracted Materials</h3>
         <div className="space-y-2">
           {data.ingredients.map((ingredient, idx) => (
-            <div key={idx} className="bg-white rounded p-3 border border-blue-100">
+            <div key={idx} className="bg-[#232937] p-3 border-[0.5px] border-[#67b68b]/30">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="font-medium text-gray-900">{ingredient.name || 'Unknown'}</span>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <span className="font-medium text-white tracking-wide font-mono">{ingredient.name || 'Unknown'}</span>
+                  <div className="text-sm text-[#B1AFAF] mt-1 tracking-wide font-mono">
                     <span>Material: {ingredient.material || 'N/A'}</span>
                     {ingredient.size && <span className="ml-3">Size: {ingredient.size}</span>}
                     {ingredient.condition && <span className="ml-3">Condition: {ingredient.condition}</span>}
@@ -245,11 +246,11 @@ function Phase1Results({ data, onIdeaSelect }: Phase1ResultsProps) {
 
       {/* Clarifying Questions */}
       {data.needs_clarification && data.clarifying_questions && data.clarifying_questions.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-yellow-900 mb-2">Need More Information</h3>
+        <div className="bg-[#2a3038] border-[0.5px] border-[#fbbf24] p-4">
+          <h3 className="text-base font-semibold text-[#fbbf24] mb-3 uppercase tracking-wide font-mono">Need More Information</h3>
           <ul className="space-y-2">
             {data.clarifying_questions.map((question, idx) => (
-              <li key={idx} className="text-sm text-yellow-800">• {question}</li>
+              <li key={idx} className="text-sm text-[#B1AFAF] tracking-wide font-mono">• {question}</li>
             ))}
           </ul>
         </div>
@@ -257,7 +258,7 @@ function Phase1Results({ data, onIdeaSelect }: Phase1ResultsProps) {
 
       {/* Ideas Section */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Project Ideas</h3>
+        <h3 className="text-base font-semibold text-white mb-3 uppercase tracking-wide font-mono">Project Ideas</h3>
         <div className="grid grid-cols-1 gap-3">
           {data.ideas.map((idea) => (
             <IdeaCard
@@ -281,13 +282,13 @@ function IdeaCard({ idea, onSelect }: IdeaCardProps) {
   return (
     <div
       onClick={onSelect}
-      className="bg-white border border-gray-200 rounded-lg p-4 hover:border-green-500 hover:shadow-md transition-all cursor-pointer"
+      className="bg-[#2a3038] border-[0.5px] border-[#67b68b]/30 p-4 hover:border-[#4ade80] transition-all cursor-pointer"
       role="button"
       tabIndex={0}
       aria-label={`Select idea: ${idea.title}`}
     >
-      <h4 className="font-semibold text-gray-900 mb-1">{idea.title}</h4>
-      <p className="text-sm text-gray-600">{idea.one_liner}</p>
+      <h4 className="font-semibold text-white mb-1 tracking-wide font-mono">{idea.title}</h4>
+      <p className="text-sm text-[#B1AFAF] tracking-wide font-mono">{idea.one_liner}</p>
     </div>
   );
 }
@@ -295,12 +296,12 @@ function IdeaCard({ idea, onSelect }: IdeaCardProps) {
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   const percentage = Math.round(confidence * 100);
   const colorClass = 
-    confidence >= 0.8 ? 'bg-green-100 text-green-800' :
-    confidence >= 0.6 ? 'bg-yellow-100 text-yellow-800' :
-    'bg-red-100 text-red-800';
+    confidence >= 0.8 ? 'bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/30' :
+    confidence >= 0.6 ? 'bg-[#fbbf24]/10 text-[#fbbf24] border-[#fbbf24]/30' :
+    'bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/30';
 
   return (
-    <span className={`text-xs px-2 py-1 rounded ${colorClass}`}>
+    <span className={`text-xs px-2 py-1 border-[0.5px] font-mono ${colorClass}`}>
       {percentage}%
     </span>
   );
@@ -308,27 +309,19 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 
 function Spinner() {
   return (
-    <svg
-      className="animate-spin h-4 w-4 inline-block"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
+    <div className="flex space-x-1">
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "0ms" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "150ms" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-[#4ade80] animate-bounce"
+        style={{ animationDelay: "300ms" }}
+      ></div>
+    </div>
   );
 }
-
