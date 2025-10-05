@@ -290,21 +290,33 @@ function MagicPencilPageContent() {
     setIsGenerating3D(true);
 
     try {
-      // Convert image URL to data URL if needed
-      let processedImageUrl = uploadedImage;
-
-      // If it's a proxy URL (starts with /api/), fetch the actual image
-      if (uploadedImage.startsWith("/api/images/")) {
-        const imgResponse = await fetch(uploadedImage);
-        const blob = await imgResponse.blob();
-        processedImageUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
+      // IMPORTANT: Use current canvas state (which includes any user edits)
+      // instead of always using the original uploadedImage
+      const canvas = canvasRef.current;
+      let processedImageUrl: string;
+      
+      if (canvas) {
+        // Get the current canvas content (includes edits if any)
+        processedImageUrl = canvas.toDataURL("image/png");
+        console.log("[Trellis] Using current canvas state (may include edits)");
+      } else {
+        // Fallback to original if canvas not available
+        processedImageUrl = uploadedImage;
+        
+        // If it's a proxy URL (starts with /api/), fetch the actual image
+        if (uploadedImage.startsWith("/api/images/")) {
+          const imgResponse = await fetch(uploadedImage);
+          const blob = await imgResponse.blob();
+          processedImageUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+        console.log("[Trellis] Using original image (no canvas)");
       }
 
-      console.log("[Trellis] Generating 3D model from hero image...");
+      console.log("[Trellis] Generating 3D model...");
       
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate`,
@@ -342,9 +354,10 @@ function MagicPencilPageContent() {
       if (data.model_file) {
         console.log("[Trellis] ✓ 3D model generated:", data.model_file);
         
-        // Store for product page
-        const imageHash = btoa(uploadedImage.substring(0, 100));
-        localStorage.setItem("productImage", uploadedImage);
+        // Store the CURRENT canvas image (with edits) for product page
+        const finalImage = canvas ? canvas.toDataURL("image/png") : uploadedImage;
+        const imageHash = btoa(finalImage.substring(0, 100));
+        localStorage.setItem("productImage", finalImage);
         localStorage.setItem(`model_${imageHash}`, data.model_file);
         
         // Navigate to product page with threadId for polling
@@ -667,12 +680,16 @@ function MagicPencilPageContent() {
               <div className="mt-4 flex items-center justify-end gap-8">
                 <button
                   onClick={() => {
-                    // Get the current canvas content (with user edits)
+                    // Get the current canvas content (with user edits if any)
                     const canvas = canvasRef.current;
                     if (canvas) {
                       const canvasDataUrl = canvas.toDataURL("image/png");
                       localStorage.setItem("productImage", canvasDataUrl);
-                      window.location.href = "/product";
+                      
+                      // Include threadId for Trellis polling
+                      const params = new URLSearchParams();
+                      if (threadId) params.set('thread', threadId);
+                      window.location.href = `/product?${params.toString()}`;
                     }
                   }}
                   className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"

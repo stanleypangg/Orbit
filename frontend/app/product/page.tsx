@@ -102,21 +102,29 @@ export default function ProductDetail() {
       }
 
       setIsLoadingPackage(true);
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const packageUrl = `${apiUrl}/api/package/package/${threadId}`;
+      console.log("[Product Page] Fetching package from:", packageUrl);
+      
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/package/package/${threadId}`
-        );
+        const response = await fetch(packageUrl);
 
         if (!response.ok) {
-          throw new Error("Failed to fetch package data");
+          if (response.status === 404) {
+            console.log("[Product Page] Package not ready yet (404), using fallback");
+            return; // Package not generated yet, use fallback
+          }
+          throw new Error(`Failed to fetch package data: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log("[Product Page] Loaded package data:", data);
+        console.log("[Product Page] ✓ Loaded package data:", data);
         setPackageData(data);
       } catch (err) {
         console.error("[Product Page] Error loading package data:", err);
-        // Don't set error state - just use fallback data
+        // Don't throw error - just use fallback data
+        // This allows the page to work even if backend is not ready
       } finally {
         setIsLoadingPackage(false);
       }
@@ -144,56 +152,76 @@ export default function ProductDetail() {
       
       // Check if there's a background generation in progress (from concept selection)
       if (threadId) {
-        console.log("[Product Page] Checking for background generation...");
-        const pollStatus = async () => {
-          try {
-            const statusResponse = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/status/${threadId}`
-            );
-            
-            if (statusResponse.ok) {
-              const statusData = await statusResponse.json();
+        const trellisKey = `trellis_queued_${threadId}`;
+        const wasQueued = localStorage.getItem(trellisKey);
+        
+        if (wasQueued) {
+          console.log("[Product Page] Trellis generation already queued, polling for status...");
+          
+          const pollStatus = async () => {
+            try {
+              const statusResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/status/${threadId}`
+              );
               
-              if (statusData.status === "complete" && statusData.model_file) {
-                console.log("[Product Page] ✓ Background generation complete!");
-                const modelUrlWithCacheBust = `${statusData.model_file}?_cb=${Date.now()}`;
-                setModelUrl(modelUrlWithCacheBust);
-                localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
-                setIsGenerating(false);
-                return true; // Stop polling
-              } else if (statusData.status === "error") {
-                console.error("[Product Page] Background generation failed:", statusData.message);
-                setError(statusData.message);
-                setIsGenerating(false);
-                return true; // Stop polling
+              if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                
+                if (statusData.status === "complete" && statusData.model_file) {
+                  console.log("[Product Page] ✓ Background generation complete!");
+                  const modelUrlWithCacheBust = `${statusData.model_file}?_cb=${Date.now()}`;
+                  setModelUrl(modelUrlWithCacheBust);
+                  localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
+                  setIsGenerating(false);
+                  return true; // Stop polling
+                } else if (statusData.status === "error") {
+                  console.error("[Product Page] Background generation failed:", statusData.message);
+                  setError(statusData.message);
+                  setIsGenerating(false);
+                  // Clear flag so user can retry
+                  localStorage.removeItem(trellisKey);
+                  return true; // Stop polling
+                } else {
+                  // Still processing
+                  console.log(`[Product Page] Background generation: ${statusData.progress || 0}%`);
+                  return false; // Continue polling
+                }
               } else {
-                // Still processing
-                console.log(`[Product Page] Background generation: ${statusData.progress}%`);
-                return false; // Continue polling
+                // Status endpoint not available, clear flag and fall through
+                console.log("[Product Page] Status check failed, clearing queue flag");
+                localStorage.removeItem(trellisKey);
+                return true;
               }
+            } catch (err) {
+              console.log("[Product Page] Error checking status:", err);
+              // Clear flag on error
+              localStorage.removeItem(trellisKey);
+              return true; // Stop polling on error
             }
-          } catch (err) {
-            console.log("[Product Page] No background generation found, will generate now");
-          }
-          return true; // Stop polling on error
-        };
-        
-        // Poll every 3 seconds
-        setIsGenerating(true);
-        const checkStatus = async () => {
-          const shouldStop = await pollStatus();
-          if (!shouldStop) {
+          };
+          
+          // Poll every 3 seconds
+          setIsGenerating(true);
+          const checkStatus = async () => {
+            const shouldStop = await pollStatus();
+            if (!shouldStop) {
+              setTimeout(checkStatus, 3000);
+            }
+          };
+          
+          const initialCheck = await pollStatus();
+          if (!initialCheck) {
             setTimeout(checkStatus, 3000);
+            return; // Exit and let polling handle it
           }
-        };
-        
-        const initialCheck = await pollStatus();
-        if (!initialCheck) {
-          setTimeout(checkStatus, 3000);
-          return; // Exit and let polling handle it
+          
+          // If polling stopped and no model, fall through to generate now
+          if (!modelUrl) {
+            console.log("[Product Page] Background job not found, will generate now");
+          } else {
+            return; // Model is set, we're done
+          }
         }
-        
-        // If no background job found, fall through to generate now
       }
       
       console.log("[Product Page] No cached model found, generating new 3D model...");
@@ -202,6 +230,12 @@ export default function ProductDetail() {
       setModelUrl(undefined);
       setIsGenerating(true);
       setError(null);
+      
+      // Mark as queued to prevent duplicates
+      if (threadId) {
+        const trellisKey = `trellis_queued_${threadId}`;
+        localStorage.setItem(trellisKey, "true");
+      }
 
       try {
         // Convert local image path to full URL or data URL

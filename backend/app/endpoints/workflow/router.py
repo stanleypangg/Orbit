@@ -1215,10 +1215,13 @@ async def process_magic_pencil_edit(thread_id: str, concept_id: int, edit_instru
 
 
 async def finalize_workflow(thread_id: str, concept_id: int):
-    """Finalize workflow with selected concept in background."""
+    """
+    Finalize workflow with selected concept in background.
+    OPTIMIZATION: Returns essential package immediately, generates detailed content asynchronously.
+    """
     try:
-        from app.workflows.phase3_nodes import create_final_package
-
+        logger.info(f"[Phase 4] Starting background packaging for thread {thread_id}")
+        
         # Get all workflow data
         state_key = f"workflow_state:{thread_id}"
         state_data = redis_service.get(state_key)
@@ -1229,33 +1232,86 @@ async def finalize_workflow(thread_id: str, concept_id: int):
         selection_key = f"concept_selection:{thread_id}"
         selection_data = redis_service.get(selection_key)
 
-        if state_data and concepts_data and selection_data:
-            state_dict = json.loads(state_data)
-            concepts = json.loads(concepts_data)
-            selection = json.loads(selection_data)
+        if not (state_data and concepts_data and selection_data):
+            logger.error(f"[Phase 4] Missing data for thread {thread_id}")
+            return
 
-            # Create final project package
-            package = await create_final_package(
-                state_dict,
-                concepts["concepts"][concept_id],
-                selection
-            )
+        state_dict = json.loads(state_data)
+        concepts = json.loads(concepts_data)
+        selection = json.loads(selection_data)
+        selected_concept = concepts["concepts"][concept_id]
 
-            # Store final package
-            package_key = f"project_package:{thread_id}"
-            redis_service.set(package_key, json.dumps(package), ex=3600)
-
-            # Mark workflow as complete
-            completion_key = f"workflow_complete:{thread_id}"
-            completion_data = {
-                "status": "complete",
+        # STEP 1: Create ESSENTIAL package immediately (no AI calls)
+        logger.info("[Phase 4] Creating essential package for thread %s", thread_id)
+        from app.workflows.phase3_nodes import create_final_package
+        
+        # Get ingredients
+        ingredients_data = state_dict.get("ingredients_data", {})
+        if hasattr(ingredients_data, 'ingredients'):
+            ingredients = [ing.model_dump() if hasattr(ing, 'model_dump') else ing for ing in ingredients_data.ingredients]
+        else:
+            ingredients = ingredients_data.get("ingredients", [])
+        
+        selected_option = state_dict.get("selected_option", {})
+        
+        # Essential package (no AI needed)
+        essential_package = {
+            "package_metadata": {
+                "generated_at": time.time(),
                 "thread_id": thread_id,
-                "final_package": package,
-                "completion_time": time.time()
-            }
-            redis_service.set(completion_key, json.dumps(completion_data), ex=3600)
+                "source_phase": "phase4",
+                "tier": "essential"
+            },
+            "executive_summary": {
+                "project_title": selected_option.get("title", "DIY Project"),
+                "tagline": selected_option.get("tagline", selected_option.get("description", "")[:100]),
+                "description": selected_option.get("description", ""),
+            },
+            "hero_image": selected_concept.get("image_url", ""),
+            "quick_start": (selected_option.get("construction_steps", []) or [])[:3],
+            "key_materials": ingredients[:5],
+        }
+        
+        # Store ESSENTIAL package immediately
+        essential_key = f"package_essential:{thread_id}"
+        redis_service.set(essential_key, json.dumps(essential_package), ex=3600)
+        logger.info("[Phase 4] Essential package stored for thread %s", thread_id)
+        
+        # Also store as final package for immediate access (will be enhanced)
+        package_key = f"final_package:{thread_id}"
+        redis_service.set(package_key, json.dumps(essential_package), ex=3600)
+        
+        # STEP 2: Generate DETAILED content in background (with AI)
+        logger.info("[Phase 4] Starting detailed content generation for thread %s", thread_id)
+        
+        # Call the full package creation (includes AI for ESG metrics and tools)
+        full_package = await create_final_package(
+            state_dict,
+            selected_concept,
+            selection
+        )
+        
+        # Store FULL package (overwrite essential)
+        redis_service.set(package_key, json.dumps(full_package), ex=3600)
+        logger.info("[Phase 4] Full package with detailed ESG/tools stored for thread %s", thread_id)
+        
+        # Store project package for compatibility
+        redis_service.set(f"project_package:{thread_id}", json.dumps(full_package), ex=3600)
+
+        # Mark workflow as complete
+        completion_key = f"workflow_complete:{thread_id}"
+        completion_data = {
+            "status": "complete",
+            "thread_id": thread_id,
+            "final_package": full_package,
+            "completion_time": time.time()
+        }
+        redis_service.set(completion_key, json.dumps(completion_data), ex=3600)
+        
+        logger.info(f"[Phase 4] ✓ Workflow finalization complete for thread {thread_id}")
 
     except Exception as e:
+        logger.error(f"[Phase 4] Error in finalize_workflow: {e}")
         # Store error
         error_key = f"workflow_error:{thread_id}"
         redis_service.set(error_key, json.dumps({"error": str(e), "phase": "finalization"}), ex=3600)

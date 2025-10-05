@@ -354,11 +354,17 @@ export default function Home() {
       return;
     }
 
-    // OPTIMIZATION: Start 3D generation in background IMMEDIATELY
-    // This runs in parallel with Phase 4 packaging
     const threadId = workflowState.threadId;
-    if (threadId && selectedConcept.image_url) {
-      console.log("[Parallel] Starting 3D generation in background...");
+    
+    // Check if 3D generation was already triggered for this thread
+    const trellisKey = `trellis_queued_${threadId}`;
+    const alreadyQueued = localStorage.getItem(trellisKey);
+    
+    if (threadId && selectedConcept.image_url && !alreadyQueued) {
+      console.log("[Trellis] Queueing 3D generation in background...");
+      
+      // Mark as queued immediately to prevent duplicates
+      localStorage.setItem(trellisKey, "true");
       
       // Convert proxy URL to data URL for Trellis
       fetch(selectedConcept.image_url)
@@ -394,8 +400,14 @@ export default function Home() {
             }
           );
         })
-        .then(() => console.log("[Parallel] ✓ 3D generation triggered in background"))
-        .catch(err => console.error("[Parallel] Failed to trigger 3D generation:", err));
+        .then(() => console.log("[Trellis] ✓ 3D generation queued successfully"))
+        .catch(err => {
+          console.error("[Trellis] Failed to queue 3D generation:", err);
+          // Remove flag on error so it can be retried
+          localStorage.removeItem(trellisKey);
+        });
+    } else if (alreadyQueued) {
+      console.log("[Trellis] Already queued, skipping duplicate request");
     }
 
     // Trigger Phase 4 packaging in background (don't await)
@@ -715,28 +727,36 @@ export default function Home() {
                               onClick={() =>
                                 handleConceptSelect(concept.concept_id)
                               }
-                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] overflow-hidden cursor-pointer transition-all hover:scale-[1.05]"
+                              className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] cursor-pointer transition-all hover:scale-[1.02]"
                               style={{
                                 animation: "fadeIn 0.5s ease-out forwards",
                               }}
                             >
                               {concept.image_url && (
-                                <div className="w-full h-48 bg-[#232937] flex items-center justify-center">
+                                <div className="w-full aspect-square bg-[#232937] overflow-hidden">
                                   <img
                                     src={concept.image_url}
                                     alt={concept.title}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                   />
                                 </div>
                               )}
                               <div className="p-3">
-                                <h4 className="text-white font-medium text-sm font-mono">
+                                <h4 className="text-white font-semibold text-sm font-mono mb-1">
                                   {concept.title}
                                 </h4>
                                 {concept.description && (
-                                  <p className="text-gray-400 text-xs mt-1 font-mono">
+                                  <p className="text-gray-400 text-xs mt-1 font-mono line-clamp-2">
                                     {concept.description}
                                   </p>
+                                )}
+                                {concept.style && (
+                                  <div className="mt-2 flex items-center gap-1">
+                                    <span className="text-[#4ade80] text-xs font-mono">🎨</span>
+                                    <span className="text-[#4ade80] text-xs font-mono capitalize">
+                                      {concept.style}
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             </div>
