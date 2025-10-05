@@ -262,7 +262,8 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
                     "budget_category": goal_data.get("budget_category", "minimal"),
                     "tool_complexity": goal_data.get("tool_complexity", "basic"),
                     "safety_considerations": goal_data.get("safety_considerations", []),
-                    "success_metrics": goal_data.get("success_metrics", [])
+                    "success_metrics": goal_data.get("success_metrics", []),
+                    "storyboard_9_steps": goal_data.get("storyboard_9_steps", [])
                 })
 
                 # Save goal data to Redis
@@ -360,6 +361,7 @@ async def choice_proposer_node(state: WorkflowState) -> Dict[str, Any]:
     - Tool complexity: {state.user_constraints.get('tool_complexity', 'basic')}
     - Estimated time: {state.user_constraints.get('estimated_time', 'flexible')}
     - Safety considerations: {', '.join(state.user_constraints.get('safety_considerations', []))}
+    - IMPORTANT exactly 9 Steps for completing the project {state.user_constraints.get('storyboard_9_steps', [])}.
 
     Generate 3 distinct, viable project options that:
     1. Use the available materials effectively

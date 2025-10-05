@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     API_PORT: int = Field(default=int(os.getenv("API_PORT", "8000")))
     
     # Redis settings
-    REDIS_URL: Optional[str] = Field(default=os.getenv("REDIS_URL"))
-    REDIS_HOST: str = Field(default=os.getenv("REDIS_HOST", "localhost"))
+    REDIS_URL: str = Field(default=os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0"))
+    REDIS_HOST: str = Field(default=os.getenv("REDIS_HOST", "127.0.0.1"))
     REDIS_PORT: int = Field(default=int(os.getenv("REDIS_PORT", "6379")))
     REDIS_DB: int = Field(default=int(os.getenv("REDIS_DB", "0")))
     
