@@ -922,7 +922,15 @@ async def create_final_package(
     try:
         # Get workflow data
         ingredients_data = state_dict.get("ingredients_data", {})
-        ingredients = ingredients_data.get("ingredients", [])
+        
+        # Handle IngredientsData object or dict
+        if hasattr(ingredients_data, 'ingredients'):
+            # It's an IngredientsData Pydantic object
+            ingredients = [ing.model_dump() if hasattr(ing, 'model_dump') else ing for ing in ingredients_data.ingredients]
+        else:
+            # It's a dictionary
+            ingredients = ingredients_data.get("ingredients", [])
+        
         selected_option = state_dict.get("selected_option", {})
         goals = state_dict.get("goals", "")
 

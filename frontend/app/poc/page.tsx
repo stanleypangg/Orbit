@@ -43,6 +43,27 @@ interface Message {
   concepts?: WorkflowConcept[];
 }
 
+// Helper function to extract which field the question is asking about
+const getFieldFromQuestion = (question: string): string => {
+  const lowerQuestion = question.toLowerCase();
+  
+  if (lowerQuestion.includes("size") || lowerQuestion.includes("how big") || lowerQuestion.includes("how large")) {
+    return "size";
+  }
+  if (lowerQuestion.includes("material") || lowerQuestion.includes("made of") || lowerQuestion.includes("what type")) {
+    return "material";
+  }
+  if (lowerQuestion.includes("category") || lowerQuestion.includes("type of item") || lowerQuestion.includes("what kind")) {
+    return "category";
+  }
+  if (lowerQuestion.includes("condition") || lowerQuestion.includes("state") || lowerQuestion.includes("how clean")) {
+    return "condition";
+  }
+  
+  // Default: return empty if can't determine
+  return "information";
+};
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -232,19 +253,35 @@ export default function Home() {
         ]);
         setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
         setExtractedIngredients(workflowState.ingredients);
+      } else if (workflowState.question) {
+        // If ingredients message already exists, update it with the clarifying question
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (
+              msg.ingredients &&
+              msg.ingredients.length > 0 &&
+              (!msg.clarifyingQuestions || msg.clarifyingQuestions.length === 0)
+            ) {
+              return {
+                ...msg,
+                clarifyingQuestions: [workflowState.question!],
+              };
+            }
+            return msg;
+          })
+        );
       }
     }
-  }, [workflowState.phase, workflowState.ingredients.length]); // Only re-run when phase or ingredient count changes
+  }, [workflowState.phase, workflowState.ingredients.length, workflowState.question]); // Also watch for question changes
 
   useEffect(() => {
     if (workflowState.needsInput && workflowState.question) {
       console.log("Workflow needs input, question:", workflowState.question);
       console.log("Current messages:", messages);
 
-      // Add clarification question to messages if not already present
+      // Add clarification question as a separate message
       const hasQuestion = messages.some(
         (m) =>
-          m.clarifyingQuestions?.includes(workflowState.question!) ||
           m.content === workflowState.question ||
           m.content.includes(workflowState.question!)
       );
@@ -255,9 +292,8 @@ export default function Home() {
         const questionId = `question-${Date.now()}`;
         const newMessage = {
           role: "assistant" as const,
-          content: workflowState.question!, // Use the question as the main content
+          content: workflowState.question!, // Show question as a normal message
           id: questionId,
-          clarifyingQuestions: [workflowState.question!],
         };
         console.log("Adding question message:", newMessage);
         setMessages((prev) => [...prev, newMessage]);
@@ -558,24 +594,15 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Clarifying Questions - Show when there are questions in the array */}
-                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
+                        {/* Missing Information - Show when there are questions */}
+                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && message.ingredients && (
                           <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 p-4 mt-2">
                             <h3 className="text-yellow-400 text-lg font-semibold mb-2 font-mono">
-                              ❓ Please Answer
+                              ⚠️ Missing Information
                             </h3>
-                            <ul className="space-y-2">
-                              {message.clarifyingQuestions.map(
-                                (question, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="text-yellow-200 text-sm font-mono"
-                                  >
-                                    • {question}
-                                  </li>
-                                )
-                              )}
-                            </ul>
+                            <p className="text-yellow-200 text-sm font-mono">
+                              {getFieldFromQuestion(message.clarifyingQuestions[0])}
+                            </p>
                           </div>
                         )}
                       </div>
