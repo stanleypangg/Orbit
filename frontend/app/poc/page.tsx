@@ -373,7 +373,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-[#161924] flex flex-col overflow-hidden font-menlo">
         {/* Header */}
-        <header
+        <header 
           className="w-full bg-[#161924] pt-6 pb-4 pl-10 border-b border-[#2A3142] transition-opacity duration-1000"
           style={{
             opacity: pageLoaded ? 1 : 0,
