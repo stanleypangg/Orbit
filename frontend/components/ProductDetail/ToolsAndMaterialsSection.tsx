@@ -64,17 +64,20 @@ export default function ToolsAndMaterialsSection({
         {canGoPrevious && (
           <button
             onClick={handlePrevious}
-            className="absolute top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center transition-colors"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hover:opacity-80 transition-opacity"
             aria-label="Previous items"
           >
-            <span className="text-[#67B68B] text-xl">‹</span>
+            <svg width="46" height="44" viewBox="0 0 46 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.657143" y="0.657143" width="44.6857" height="41.8107" rx="3.17619" stroke="#67B68B" strokeWidth="1.31429"/>
+              <path d="M27.6187 28.2302L21.9093 22.5208L27.6187 16.799L25.861 15.0414L18.3815 22.5208L25.861 30.0003L27.6187 28.2302Z" fill="#67B68B"/>
+            </svg>
           </button>
         )}
 
         {/* Items Container */}
         <div
           ref={containerRef}
-          className="overflow-hidden px-12"
+          className="overflow-hidden px-14"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           <div
@@ -175,10 +178,13 @@ export default function ToolsAndMaterialsSection({
         {canGoNext && (
           <button
             onClick={handleNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center transition-colors"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hover:opacity-80 transition-opacity"
             aria-label="Next items"
           >
-            <span className="text-[#67B68B] text-xl">›</span>
+            <svg width="46" height="44" viewBox="0 0 46 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.657143" y="0.657143" width="44.6857" height="41.8107" rx="3.17619" stroke="#67B68B" strokeWidth="1.31429"/>
+              <path d="M18.3813 28.2302L24.0907 22.5208L18.3813 16.799L20.139 15.0414L27.6185 22.5208L20.139 30.0003L18.3813 28.2302Z" fill="#67B68B"/>
+            </svg>
           </button>
         )}
       </div>
