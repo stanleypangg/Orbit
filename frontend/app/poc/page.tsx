@@ -719,7 +719,7 @@ export default function Home() {
       <div className="min-h-screen bg-[#161924] flex flex-col overflow-hidden font-menlo">
         {/* Header */}
         <header
-          className="w-full bg-[#161924] pt-6 pb-4 pl-10 border-b border-[#2A3142] transition-opacity duration-1000"
+          className="w-full bg-[#161924] pt-4 pb-4 pl-10 border-b border-[#2A3142] transition-opacity duration-1000"
           style={{
             opacity: pageLoaded ? 1 : 0,
           }}
@@ -742,15 +742,15 @@ export default function Home() {
             opacity: pageLoaded ? 1 : 0,
           }}
         >
-          {/* Messages Area - Expands when in focus mode */}
+          {/* Messages Area - Shrinks when concepts are shown */}
           <div
             ref={chatContainerRef}
             onScroll={handleMessagesScroll}
-            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar relative"
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar relative transition-all duration-500 ease-in-out"
             style={{
               height: isConceptFocusMode
-                ? "calc(100vh - 180px)"
-                : "calc(100vh - 280px)",
+                ? "calc(100vh - 260px)"
+                : "calc(100vh - 180px)",
             }}
           >
             <div className="space-y-4">
@@ -1115,77 +1115,28 @@ export default function Home() {
                     ></div>
                   </div>
                   <p className="text-[#4ade80] text-xl font-mono font-semibold animate-pulse">
-                    Preparing your project...
+                    Loading...
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Chat Input - Hidden when in focus mode */}
-          <div
-            className="mt-4 transition-opacity duration-[1500ms] ease-in-out"
-            style={{
-              opacity: isConceptFocusMode ? 0 : animationPhase >= 7 ? 1 : 0.01,
-              pointerEvents:
-                animationPhase >= 7 && !isConceptFocusMode ? "auto" : "none",
-              visibility: animationPhase >= 6 ? "visible" : "hidden",
-            }}
-          >
-            <div className="relative">
-              <textarea
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Continue the conversation..."
-                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
-                rows={2}
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!chatInput.trim() || workflowState.isLoading}
-                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
-              >
-                {workflowState.isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <div className="flex space-x-1">
-                      <div
-                        className="w-2 h-2 bg-black animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-black animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-black animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      ></div>
-                    </div>
-                    Processing
-                  </span>
-                ) : (
-                  "Send"
-                )}
-              </button>
-            </div>
-          </div>
-
           {/* Concept Confirmation Button - Shows when concept is selected */}
           {isConceptFocusMode && selectedConceptId && (
-            <div className="mt-4 animate-fadeIn">
-              <div className="bg-[#1a2030] border-[0.5px] border-[#4ade80] p-6">
-                <div className="flex items-center justify-between gap-6">
+            <div
+              className="mt-4 transition-opacity duration-700 ease-in-out"
+              style={{
+                opacity: isConceptFocusMode && selectedConceptId ? 1 : 0,
+              }}
+            >
+              <div className="bg-[#1a2030] border-[0.5px] border-[#4ade80] p-4">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
-                    <p className="text-[#B1AFAF] text-sm font-mono mb-1">
+                    <p className="text-[#B1AFAF] text-xs font-mono mb-1">
                       Selected Concept:
                     </p>
-                    <p className="text-white text-lg font-semibold font-mono">
+                    <p className="text-white text-base font-semibold font-mono">
                       {
                         workflowState.concepts.find(
                           (c) => c.concept_id === selectedConceptId
@@ -1195,16 +1146,9 @@ export default function Home() {
                   </div>
                   <div className="flex gap-3">
                     <button
-                      onClick={handleGoBack}
-                      disabled={isTransitioning}
-                      className="px-8 py-4 bg-[#232937] hover:bg-[#2a3142] text-white font-mono font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-[0.5px] border-[#4ade80]/30 hover:border-[#4ade80]"
-                    >
-                      ← Go Back
-                    </button>
-                    <button
                       onClick={handleConceptConfirm}
                       disabled={isTransitioning}
-                      className="px-12 py-4 bg-[#4ade80] hover:bg-[#3bc970] text-black font-mono font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider shadow-lg hover:shadow-xl hover:scale-105"
+                      className="px-8 py-3 bg-[#4ade80] hover:bg-[#3bc970] text-black font-mono font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider shadow-lg hover:shadow-xl hover:scale-105"
                     >
                       {isTransitioning ? (
                         <span className="flex items-center gap-2">
@@ -1312,10 +1256,10 @@ export default function Home() {
               }}
               placeholder={animationPhase < 3 ? placeholderText || "" : ""}
               style={{
-                height: animationPhase >= 4 ? "60vh" : "10rem",
+                height: animationPhase >= 4 ? "calc(100vh - 180px)" : "10rem",
                 transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
               }}
-              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-[#B1AFAF] font-mono"
+              className="w-full bg-[#232937] text-white text-base border-[0.5px] p-5 resize-none focus:outline-none border-[#4ade80] placeholder:text-[#B1AFAF] font-mono shadow-[0_0_20px_rgba(103,182,139,0.3)]"
             />
           </div>
         </div>

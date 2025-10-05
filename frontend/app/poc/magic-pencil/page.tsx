@@ -488,14 +488,14 @@ function MagicPencilPageContent() {
   };
 
   return (
-    <div
-      className="h-screen pt-12 bg-[#161924] flex flex-col font-menlo overflow-hidden transition-opacity duration-1000"
-      style={{
-        opacity: pageLoaded ? 1 : 0,
-      }}
-    >
+    <div className="h-screen pt-12 bg-[#161924] flex flex-col font-menlo overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col pt-4 max-w-7xl mx-auto w-full px-8">
+      <div
+        className="flex-1 flex flex-col pt-4 max-w-7xl mx-auto w-full px-8 transition-opacity duration-1000"
+        style={{
+          opacity: pageLoaded ? 1 : 0,
+        }}
+      >
         <div className="w-full max-w-full">
           {/* Title */}
           <h1 className="text-3xl font-light tracking-wider text-white mb-1">
