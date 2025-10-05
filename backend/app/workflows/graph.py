@@ -221,6 +221,14 @@ class RecycleWorkflowOrchestrator:
         )
 
         # Setup Redis checkpointer for interrupt/resume
+        # Note: Checkpointing requires Redis with RedisJSON module
+        # For now, running without checkpointing to avoid JSON.SET errors
+        enable_checkpointing = os.getenv("WORKFLOW_ENABLE_CHECKPOINTING", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         enable_interrupts = os.getenv("WORKFLOW_ENABLE_INTERRUPTS", "false").lower() in {
             "1",
             "true",
@@ -231,18 +239,24 @@ class RecycleWorkflowOrchestrator:
         if enable_interrupts:
             compile_kwargs["interrupt_before"] = ["process_clarification"]
 
-        try:
-            checkpointer = create_redis_checkpointer()
-            self.compiled_graph = workflow.compile(
-                checkpointer=checkpointer,
-                **compile_kwargs,
-            )
-        except Exception as e:
-            logger.warning(
-                "Redis checkpointer setup failed: %s. Running without checkpointing.",
-                e,
-            )
+        if enable_checkpointing:
+            try:
+                checkpointer = create_redis_checkpointer()
+                self.compiled_graph = workflow.compile(
+                    checkpointer=checkpointer,
+                    **compile_kwargs,
+                )
+                logger.info("Workflow compiled with Redis checkpointing enabled")
+            except Exception as e:
+                logger.warning(
+                    "Redis checkpointer setup failed: %s. Running without checkpointing.",
+                    e,
+                )
+                self.compiled_graph = workflow.compile(**compile_kwargs)
+        else:
+            # Compile without checkpointing (default for standard Redis without RedisJSON)
             self.compiled_graph = workflow.compile(**compile_kwargs)
+            logger.info("Workflow compiled without checkpointing (standard Redis mode)")
 
         self.graph = workflow
         logger.info("RecycleWorkflowOrchestrator initialized successfully")
@@ -324,24 +338,67 @@ class RecycleWorkflowOrchestrator:
         try:
             config = {"configurable": {"thread_id": thread_id}}
 
-            # Get current state from checkpointer
-            current_state = self.compiled_graph.get_state(config)
+            # Check if checkpointing is enabled
+            if self.compiled_graph.checkpointer:
+                # Get current state from checkpointer
+                current_state = self.compiled_graph.get_state(config)
 
-            if not current_state:
-                return {
-                    "status": "error",
-                    "error": "Workflow state not found. Please start a new workflow."
-                }
+                if not current_state:
+                    return {
+                        "status": "error",
+                        "error": "Workflow state not found. Please start a new workflow."
+                    }
 
-            # Update state with user response
-            updated_values = current_state.values.copy()
-            updated_values["user_input"] = user_response  # Add user response to state
+                # Update state with user response
+                updated_values = current_state.values.copy()
+                updated_values["user_input"] = user_response  # Add user response to state
 
-            # Continue from where we left off
-            result = await self.compiled_graph.ainvoke(
-                updated_values,
-                config=config
-            )
+                # Continue from where we left off
+                result = await self.compiled_graph.ainvoke(
+                    updated_values,
+                    config=config
+                )
+            else:
+                # Without checkpointing, we need to restart with clarification
+                # Get the previous state from Redis
+                from app.core.redis import redis_service
+                import json
+                
+                state_key = f"workflow_state:{thread_id}"
+                state_data = redis_service.get(state_key)
+                
+                if not state_data:
+                    return {
+                        "status": "error",
+                        "error": "Workflow state not found. Checkpointing is disabled. Please start a new workflow."
+                    }
+                
+                previous_state = json.loads(state_data)
+                
+                # Create a new state with the clarification
+                from app.workflows.state import WorkflowState
+                
+                # Get the result from previous state
+                prev_result = previous_state.get("result", {})
+                
+                # Create new state with user response appended
+                continue_state = WorkflowState(
+                    thread_id=thread_id,
+                    user_input=user_response,
+                    initial_user_input=prev_result.get("initial_user_input", ""),
+                    current_phase=prev_result.get("current_phase", "ingredient_discovery"),
+                    current_node=prev_result.get("current_node", "P1a"),
+                    start_time=prev_result.get("start_time", __import__('time').time()),
+                    clarification_loop_count=prev_result.get("clarification_loop_count", 0) + 1,
+                    # Copy over ingredients if they exist
+                    ingredients_data=prev_result.get("ingredients_data")
+                )
+                
+                # Run workflow from current point
+                result = await self.compiled_graph.ainvoke(
+                    continue_state.model_dump(),
+                    config=config
+                )
 
             # Check if still waiting for input or completed
             if result.get("needs_user_input", False):
@@ -362,6 +419,8 @@ class RecycleWorkflowOrchestrator:
 
         except Exception as e:
             logger.error(f"Workflow continuation failed: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {
                 "status": "error",
                 "thread_id": thread_id,

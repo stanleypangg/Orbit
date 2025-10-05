@@ -96,6 +96,44 @@ class RedisService:
             self._use_fallback = True
             return True
 
+    def keys(self, pattern: str) -> list[str]:
+        """Get keys matching pattern."""
+        try:
+            if self._use_fallback:
+                import fnmatch
+                return [k for k in self._fallback_store.keys() if fnmatch.fnmatch(k, pattern)]
+            return self.client.keys(pattern)
+        except RedisError:
+            self._use_fallback = True
+            import fnmatch
+            return [k for k in self._fallback_store.keys() if fnmatch.fnmatch(k, pattern)]
+    
+    def incr(self, key: str, amount: int = 1) -> int:
+        """Increment key by amount."""
+        try:
+            if self._use_fallback:
+                current = int(self._fallback_store.get(key, 0))
+                new_val = current + amount
+                self._fallback_store[key] = str(new_val)
+                return new_val
+            return self.client.incr(key, amount)
+        except RedisError:
+            self._use_fallback = True
+            current = int(self._fallback_store.get(key, 0))
+            new_val = current + amount
+            self._fallback_store[key] = str(new_val)
+            return new_val
+    
+    def expire(self, key: str, time: int) -> bool:
+        """Set expiration on key (ignored in fallback)."""
+        try:
+            if self._use_fallback:
+                return True  # Fallback doesn't support expiration
+            return self.client.expire(key, time)
+        except RedisError:
+            self._use_fallback = True
+            return True
+
     def flushdb(self) -> bool:
         """Clear stored keys for the active database or fallback store."""
         try:

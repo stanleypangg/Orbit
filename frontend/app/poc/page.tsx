@@ -5,14 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import PresetCard from "@/components/PresetCard";
-import { handlePhase1 } from "@/lib/chat/validator-and-calls";
-import { Phase1Response, Idea, Ingredient } from "@/lib/chat/types";
+import { useWorkflow } from "@/lib/workflow/useWorkflow";
+import { Idea, Ingredient } from "@/lib/chat/types";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   id: string;
-  phase1Data?: Phase1Response;
+  ingredients?: Ingredient[];
+  needsClarification?: boolean;
+  clarifyingQuestions?: string[];
 }
 
 export default function Home() {
@@ -30,6 +32,10 @@ export default function Home() {
   const [extractedIngredients, setExtractedIngredients] = useState<
     Ingredient[]
   >([]);
+
+  const { state: workflowState, startWorkflow, resumeWorkflow } = useWorkflow({
+    apiUrl: 'http://localhost:8000',
+  });
 
   const presets = [
     {
@@ -112,40 +118,12 @@ export default function Home() {
     }, 2200);
 
     setTimeout(async () => {
-      // Phase 8: Fetch AI response
+      // Phase 8: Start workflow
       setAnimationPhase(8);
       setIsGenerating(false);
 
-      // Call Phase 1 API with the initial message
-      try {
-        const phase1Response = await handlePhase1(initialMessage);
-        const assistantId = (Date.now() + 1).toString();
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "I've analyzed your materials! Here's what I found:",
-            id: assistantId,
-            phase1Data: phase1Response,
-          },
-        ]);
-        setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
-        setExtractedIngredients(phase1Response.ingredients);
-      } catch (error) {
-        console.error("Phase 1 API error:", error);
-        const assistantId = (Date.now() + 1).toString();
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content:
-              "I'm sorry, I encountered an error analyzing your materials. Please try again.",
-            id: assistantId,
-          },
-        ]);
-        setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
-      }
+      // Start workflow with the initial message
+      await startWorkflow(initialMessage);
     }, 1900);
   };
 
@@ -163,36 +141,69 @@ export default function Home() {
     setAnimatedMessageIds((prev) => new Set([...prev, userMessageId]));
     setChatInput("");
 
-    // Call Phase 1 API with the follow-up message
-    try {
-      const phase1Response = await handlePhase1(chatInput);
-      const assistantId = (Date.now() + 1).toString();
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Here's an updated analysis based on your input:",
-          id: assistantId,
-          phase1Data: phase1Response,
-        },
-      ]);
-      setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
-      setExtractedIngredients(phase1Response.ingredients);
-    } catch (error) {
-      console.error("Phase 1 API error:", error);
-      const assistantId = (Date.now() + 1).toString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "I'm sorry, I encountered an error. Please try again.",
-          id: assistantId,
-        },
-      ]);
-      setAnimatedMessageIds((prev) => new Set([...prev, assistantId]));
-    }
+    // Resume workflow with clarification
+    await resumeWorkflow(chatInput);
   };
+
+  // Handle workflow state changes
+  useEffect(() => {
+    if (workflowState.phase === 'ingredient_discovery' && workflowState.ingredients.length > 0) {
+      // Update messages with ingredient data
+      const assistantId = `assistant-${Date.now()}`;
+      const hasNewIngredients = !messages.some(m => m.ingredients && m.ingredients.length > 0);
+      
+      if (hasNewIngredients) {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I've analyzed your materials! Here's what I found:",
+            id: assistantId,
+            ingredients: workflowState.ingredients,
+            needsClarification: workflowState.needsInput,
+            clarifyingQuestions: workflowState.question ? [workflowState.question] : [],
+          },
+        ]);
+        setAnimatedMessageIds(prev => new Set([...prev, assistantId]));
+        setExtractedIngredients(workflowState.ingredients);
+      }
+    }
+
+    if (workflowState.needsInput && workflowState.question) {
+      // Add clarification question to messages if not already present
+      const hasQuestion = messages.some(m => 
+        m.clarifyingQuestions?.includes(workflowState.question!)
+      );
+      
+      if (!hasQuestion) {
+        const questionId = `question-${Date.now()}`;
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: workflowState.question!,
+            id: questionId,
+            needsClarification: true,
+          },
+        ]);
+        setAnimatedMessageIds(prev => new Set([...prev, questionId]));
+      }
+    }
+
+    if (workflowState.error) {
+      const errorId = `error-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Error: ${workflowState.error}`,
+          id: errorId,
+        },
+      ]);
+      setAnimatedMessageIds(prev => new Set([...prev, errorId]));
+      setIsGenerating(false);
+    }
+  }, [workflowState, messages, setExtractedIngredients, setIsGenerating]);
 
   const handleIdeaSelect = (idea: Idea) => {
     setSelectedIdea(idea);
@@ -289,8 +300,8 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Render Phase 1 data if present */}
-                    {message.phase1Data && (
+                    {/* Render Ingredients if present */}
+                    {message.ingredients && message.ingredients.length > 0 && (
                       <div className="mt-4 space-y-4">
                         {/* Ingredients Section */}
                         <div className="bg-[#1a2030] border-[0.5px] border-[#3a4560] rounded-lg p-4">
@@ -298,99 +309,60 @@ export default function Home() {
                             📦 Extracted Materials
                           </h3>
                           <div className="space-y-2">
-                            {message.phase1Data.ingredients.map(
-                              (ingredient, idx) => (
-                                <div
-                                  key={idx}
-                                  className="bg-[#232937] rounded p-3 border-[0.5px] border-[#2A3142]"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <span className="text-white font-medium">
-                                        {ingredient.name || "Unknown"}
-                                      </span>
-                                      <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3">
-                                        <span>
-                                          Material:{" "}
-                                          {ingredient.material || "N/A"}
-                                        </span>
-                                        {ingredient.size && (
-                                          <span>Size: {ingredient.size}</span>
-                                        )}
-                                        {ingredient.condition && (
-                                          <span>
-                                            Condition: {ingredient.condition}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span
-                                      className={`text-xs px-2 py-1 rounded ml-2 ${
-                                        ingredient.confidence >= 0.8
-                                          ? "bg-green-900 text-green-200"
-                                          : ingredient.confidence >= 0.6
-                                          ? "bg-yellow-900 text-yellow-200"
-                                          : "bg-red-900 text-red-200"
-                                      }`}
-                                    >
-                                      {Math.round(ingredient.confidence * 100)}%
-                                    </span>
-                                  </div>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Clarifying Questions */}
-                        {message.phase1Data.needs_clarification &&
-                          message.phase1Data.clarifying_questions &&
-                          message.phase1Data.clarifying_questions.length >
-                            0 && (
-                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
-                              <h3 className="text-yellow-400 text-lg font-semibold mb-2">
-                                ❓ Need More Information
-                              </h3>
-                              <ul className="space-y-2">
-                                {message.phase1Data.clarifying_questions.map(
-                                  (question, idx) => (
-                                    <li
-                                      key={idx}
-                                      className="text-yellow-200 text-sm"
-                                    >
-                                      • {question}
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                        {/* Ideas Section */}
-                        <div>
-                          <h3 className="text-[#4ade80] text-lg font-semibold mb-3">
-                            💡 Project Ideas
-                          </h3>
-                          <div className="grid grid-cols-1 gap-3">
-                            {message.phase1Data.ideas.map((idea) => (
+                            {message.ingredients.map((ingredient, idx) => (
                               <div
-                                key={idea.id}
-                                onClick={() => handleIdeaSelect(idea)}
-                                className="bg-[#1a2030] border-[0.5px] border-[#3a4560] hover:border-[#4ade80] rounded-lg p-4 cursor-pointer transition-all hover:scale-[1.02]"
-                                style={{
-                                  animation: "fadeIn 0.5s ease-out forwards",
-                                }}
+                                key={idx}
+                                className="bg-[#232937] rounded p-3 border-[0.5px] border-[#2A3142]"
                               >
-                                <h4 className="text-white font-semibold mb-1">
-                                  {idea.title}
-                                </h4>
-                                <p className="text-gray-400 text-sm">
-                                  {idea.one_liner}
-                                </p>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <span className="text-white font-medium">
+                                      {ingredient.name || "Unknown"}
+                                    </span>
+                                    <div className="text-sm text-gray-400 mt-1 flex flex-wrap gap-3">
+                                      <span>
+                                        Material: {ingredient.material || "N/A"}
+                                      </span>
+                                      {ingredient.size && (
+                                        <span>Size: {ingredient.size}</span>
+                                      )}
+                                      {ingredient.category && (
+                                        <span>Category: {ingredient.category}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded ml-2 ${
+                                      ingredient.confidence >= 0.8
+                                        ? "bg-green-900 text-green-200"
+                                        : ingredient.confidence >= 0.6
+                                        ? "bg-yellow-900 text-yellow-200"
+                                        : "bg-red-900 text-red-200"
+                                    }`}
+                                  >
+                                    {Math.round(ingredient.confidence * 100)}%
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>
                         </div>
+
+                        {/* Clarifying Questions */}
+                        {message.needsClarification && message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
+                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4">
+                            <h3 className="text-yellow-400 text-lg font-semibold mb-2">
+                              ❓ Need More Information
+                            </h3>
+                            <ul className="space-y-2">
+                              {message.clarifyingQuestions.map((question, idx) => (
+                                <li key={idx} className="text-yellow-200 text-sm">
+                                  • {question}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
