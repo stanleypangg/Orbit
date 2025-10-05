@@ -115,21 +115,23 @@ async def get_image(image_id: str):
         
         image_data = json.loads(image_data_str)
         
-        # Check if we have actual image data (base64) or need to create placeholder
+        # Check if we have actual image data (base64), external URL, or need placeholder
         if image_data.get("base64_data"):
-            # Serve real image
+            # Serve real image from base64
             image_bytes = base64.b64decode(image_data["base64_data"])
             return Response(content=image_bytes, media_type=MEDIA_TYPE_PNG)
         
         elif image_data.get("url"):
-            # Return redirect to external URL
+            # Redirect to external URL (e.g., Replicate, Imagen, DALL-E)
             from fastapi.responses import RedirectResponse
-            return RedirectResponse(url=image_data["url"])
+            logger.info(f"Redirecting to generated image: {image_data['url'][:80]}...")
+            return RedirectResponse(url=image_data["url"], status_code=302)
         
         else:
-            # Create and serve placeholder
+            # Create and serve placeholder (fallback if generation failed)
             style = image_data.get("style", "default")
             title = image_data.get("title", "Concept")
+            logger.info(f"Serving placeholder for {title} ({style})")
             
             img_bytes = create_placeholder_image(style, title)
             

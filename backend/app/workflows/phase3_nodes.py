@@ -269,28 +269,24 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         }
 
     async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept") -> ConceptVariant:
-        """Generate a single high-quality hero image with rate limiting."""
+        """Generate a single high-quality hero image with rate limiting using FLUX."""
         async with semaphore:
             try:
-                # TODO: Integrate real AI image generation API here
-                # The detailed hero prompts are now ready for:
-                # 1. Google Imagen 3 API (recommended for product photography)
-                # 2. DALL-E 3 (good quality, easy integration)
-                # 3. Stability AI SDXL (customizable, cost-effective)
-                # 
-                # Example integration:
-                # response = await imagen_client.generate_image(
-                #     prompt=variant.image_prompt,
-                #     aspect_ratio="1:1",
-                #     number_of_images=1,
-                #     safety_filter_level="block_some"
-                # )
-                # image_url = response.images[0].url
+                # Import image generation service
+                from app.integrations.image_generation import generate_concept_image
+                
+                # Generate real AI image using FLUX-schnell (fast & high quality)
+                logger.info(f"IMG: Generating real AI image for {title} ({variant.style})")
+                image_url = await generate_concept_image(
+                    prompt=variant.image_prompt,
+                    style=variant.style,
+                    model="flux-schnell"  # Fast, 4 steps, ~2-3 seconds
+                )
                 
                 variant.image_id = f"hero_{state.thread_id}_{variant.style}_{int(time.time())}"
-                variant.aesthetic_score = 0.9  # Hero quality
+                variant.aesthetic_score = 0.95  # Real AI quality
 
-                # Store image metadata with enhanced prompt
+                # Store image metadata with real generated image URL
                 image_key = f"image:{variant.image_id}"
                 image_metadata = {
                     "thread_id": state.thread_id,
@@ -298,16 +294,18 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                     "title": title,
                     "prompt": variant.image_prompt,  # Full detailed prompt
                     "generated_at": time.time(),
-                    "quality": "hero",  # Mark as hero quality
-                    "status": "placeholder"
-                    # When integrating real AI:
-                    # "base64_data": "<base64 encoded image>"  - for inline images
-                    # "url": "<external url>"  - for images hosted elsewhere
-                    # "status": "generated"  - mark as real generated image
+                    "quality": "hero",
+                    "model": "flux-schnell",
+                    "status": "generated" if image_url else "placeholder",
+                    "url": image_url if image_url else None  # Real image URL from Replicate
                 }
                 redis_service.set(image_key, json.dumps(image_metadata), ex=7200)  # 2 hours TTL
 
-                logger.info(f"IMG: Created hero image for {variant.style}: {title}")
+                if image_url:
+                    logger.info(f"IMG: ✓ Generated real AI image for {title}: {image_url[:80]}...")
+                else:
+                    logger.warning(f"IMG: Failed to generate image, using placeholder for {title}")
+                
                 return variant
 
             except Exception as e:
