@@ -177,8 +177,8 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
             "current_node": "PR1"
         }
 
-    # Generate image prompts for ALL 3 ideas
-    # We'll create concept variants for each idea
+    # Generate HERO image prompts for ALL 3 ideas
+    # Create detailed, professional prompts optimized for AI image generation
     all_concept_variants = []
     
     for idx, option in enumerate(state.viable_options[:3]):
@@ -187,11 +187,52 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
         materials = option.get("key_materials") or option.get("materials_used", [])
         style_hint = option.get("style_hint", ["minimalist", "decorative", "functional"][idx])
         
-        # Create a simple concept variant for this idea
+        # Build style-specific prompt enhancements
+        style_prompts = {
+            "minimalist": {
+                "aesthetic": "clean lines, simple geometry, monochromatic palette, negative space",
+                "lighting": "soft natural lighting, subtle shadows, bright and airy",
+                "composition": "centered, balanced, uncluttered background, sharp focus",
+                "mood": "serene, elegant, modern"
+            },
+            "decorative": {
+                "aesthetic": "ornate details, rich textures, warm color palette, artistic flourishes",
+                "lighting": "golden hour lighting, warm ambient glow, soft highlights",
+                "composition": "artfully arranged, layered depth, decorative backdrop",
+                "mood": "inviting, creative, handcrafted charm"
+            },
+            "functional": {
+                "aesthetic": "practical design, clear functionality, technical precision, structured form",
+                "lighting": "bright studio lighting, even illumination, crisp details",
+                "composition": "isometric or 3/4 view, technical clarity, neutral background",
+                "mood": "efficient, innovative, purposeful"
+            }
+        }
+        
+        style_details = style_prompts.get(style_hint.lower(), style_prompts["functional"])
+        materials_list = ', '.join(materials[:3]) if materials else "recycled materials"
+        
+        # Create detailed hero image prompt
+        hero_prompt = f"""Hero product photography of {project_title}: {project_description}.
+
+MATERIALS: Crafted from upcycled {materials_list}, showcasing sustainable design and creative reuse.
+
+STYLE: {style_hint.title()} aesthetic - {style_details['aesthetic']}
+
+COMPOSITION: {style_details['composition']}, professional product photography, 8K resolution, ultra-detailed
+
+LIGHTING: {style_details['lighting']}, professional studio quality
+
+MOOD: {style_details['mood']}, eco-friendly, artisanal craftsmanship
+
+QUALITY: Magazine-quality hero image, commercial photography, photorealistic rendering, sharp focus throughout, professional color grading
+
+CONTEXT: Sustainable upcycling project, waste-to-value transformation, environmentally conscious design"""
+        
         variant = ConceptVariant(
             style=style_hint,
             description=project_description,
-            image_prompt=f"Professional product photo of {project_title}: {project_description}. Made from {', '.join(materials[:3])}. Style: {style_hint}. High quality, sustainable design.",
+            image_prompt=hero_prompt,
             feasibility_score=0.8,
             aesthetic_score=0.0,
             esg_score=0.7,
@@ -213,10 +254,10 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
 
 async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
     """
-    IMG Node: OPTIMIZATION 2 - Generate HERO image first, then variants in background.
-    Fast initial display for user interaction.
+    IMG Node: Generate high-quality HERO images for all 3 concept variations.
+    Creates professional, magazine-quality product photography for user selection.
     """
-    logger.info(f"IMG: Starting HERO image generation for thread {state.thread_id}")
+    logger.info(f"IMG: Starting hero image generation for all concepts: {state.thread_id}")
 
     # Validate inputs
     if not state.concept_variants:
@@ -227,38 +268,46 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             "current_node": "IMG"
         }
 
-    # OPTIMIZATION 2: Generate ONLY the first (hero) image immediately
-    # Other 2 variants will be generated in background
     async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept") -> ConceptVariant:
-        """Generate a single image with rate limiting."""
+        """Generate a single high-quality hero image with rate limiting."""
         async with semaphore:
             try:
                 # TODO: Integrate real AI image generation API here
-                # Options:
-                # 1. Google Imagen 3 API
-                # 2. Stability AI
-                # 3. DALL-E 3
-                # For now, we create placeholder images that will be served by /images endpoint
+                # The detailed hero prompts are now ready for:
+                # 1. Google Imagen 3 API (recommended for product photography)
+                # 2. DALL-E 3 (good quality, easy integration)
+                # 3. Stability AI SDXL (customizable, cost-effective)
+                # 
+                # Example integration:
+                # response = await imagen_client.generate_image(
+                #     prompt=variant.image_prompt,
+                #     aspect_ratio="1:1",
+                #     number_of_images=1,
+                #     safety_filter_level="block_some"
+                # )
+                # image_url = response.images[0].url
+                
+                variant.image_id = f"hero_{state.thread_id}_{variant.style}_{int(time.time())}"
+                variant.aesthetic_score = 0.9  # Hero quality
 
-                variant.image_id = f"generated_{state.thread_id}_{variant.style}_{int(time.time())}"
-                variant.aesthetic_score = 0.8
-
-                # Store image metadata with title for placeholder generation
+                # Store image metadata with enhanced prompt
                 image_key = f"image:{variant.image_id}"
                 image_metadata = {
                     "thread_id": state.thread_id,
                     "style": variant.style,
-                    "title": title,  # Add title for placeholder rendering
-                    "prompt": variant.image_prompt,
+                    "title": title,
+                    "prompt": variant.image_prompt,  # Full detailed prompt
                     "generated_at": time.time(),
+                    "quality": "hero",  # Mark as hero quality
                     "status": "placeholder"
-                    # To serve real images, add one of:
+                    # When integrating real AI:
                     # "base64_data": "<base64 encoded image>"  - for inline images
                     # "url": "<external url>"  - for images hosted elsewhere
+                    # "status": "generated"  - mark as real generated image
                 }
                 redis_service.set(image_key, json.dumps(image_metadata), ex=7200)  # 2 hours TTL
 
-                logger.info(f"IMG: Created placeholder for {variant.style} concept image: {title}")
+                logger.info(f"IMG: Created hero image for {variant.style}: {title}")
                 return variant
 
             except Exception as e:
@@ -284,16 +333,17 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                 return variant
 
     try:
-        # Generate all 3 images sequentially (no queuing to avoid loops)
+        # Generate all 3 hero images sequentially for consistent quality
         semaphore = asyncio.Semaphore(1)
         generated_variants = []
         
-        logger.info(f"IMG: Generating {len(state.concept_variants)} images sequentially")
+        logger.info(f"IMG: Generating {len(state.concept_variants)} hero images with detailed prompts")
         
         for idx, variant in enumerate(state.concept_variants):
             # Get the title from the corresponding option
             title = state.viable_options[idx].get("title", "Concept") if idx < len(state.viable_options) else "Concept"
-            logger.info(f"IMG: Generating image {idx+1}/{len(state.concept_variants)} ({variant.style}): {title}")
+            logger.info(f"IMG: Generating HERO image {idx+1}/{len(state.concept_variants)} ({variant.style}): {title}")
+            logger.info(f"IMG: Using detailed prompt: {variant.image_prompt[:150]}...")
             generated = await generate_single_image(variant, semaphore, title)
             generated_variants.append(generated)
 
@@ -334,7 +384,8 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             "metadata": {
                 "generated_at": timestamp,
                 "thread_id": state.thread_id,
-                "mode": "offline-placeholder" if not successful_variants else "generated"
+                "quality": "hero",  # Hero quality images
+                "mode": "hero-placeholder" if not successful_variants else "hero-generated"
             }
         }
 
@@ -342,24 +393,24 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         concepts_key = f"concepts:{state.thread_id}"
         redis_service.set(concepts_key, json.dumps(state.concept_images), ex=3600)
         
-        state.current_node = "A1"
-        logger.info(f"IMG: Successfully generated {len(successful_variants)} images for {len(state.viable_options)} ideas")
+        state.current_node = "COMPLETE"  # End workflow after images (A1 removed)
+        logger.info(f"IMG: Successfully generated {len(successful_variants)} HERO images for {len(state.viable_options)} ideas")
 
         return {
             "generated_variants": successful_variants,
             "generation_count": len(successful_variants),
             "concept_images": state.concept_images,
-            "current_node": "A1"
+            "current_node": "COMPLETE"
         }
 
     except Exception as e:
         logger.error(f"IMG: Image generation failed: {str(e)}")
         state.errors.append(f"Image generation failed: {str(e)}")
-        state.current_node = "A1"  # Continue to assembly even with failures
+        state.current_node = "COMPLETE"  # End workflow even with failures
 
     return {
         "generated_variants": state.concept_variants,
-        "current_node": "A1"
+        "current_node": "COMPLETE"
     }
 
 

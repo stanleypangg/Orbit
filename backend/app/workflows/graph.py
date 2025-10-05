@@ -75,9 +75,11 @@ class RecycleWorkflowOrchestrator:
         # Phase 3: Image Generation (runs automatically after O1)
         workflow.add_node("PR1_prompt_builder", prompt_builder_node)
         workflow.add_node("IMG_generation", image_generation_node)
-        workflow.add_node("A1_assembly", preview_assembly_node)
+        # A1_assembly REMOVED - Phase 2 already has lite descriptions, Phase 4 generates full docs
+        # workflow.add_node("A1_assembly", preview_assembly_node)
         
         # Phase 4: Final packaging triggered manually via /select-concept endpoint (not in graph)
+        # Phase 4 will generate FULL documentation for SELECTED concept only
 
         # Entry point - always start with ingredient extraction
         workflow.add_edge(START, "P1a_extract")
@@ -122,12 +124,12 @@ class RecycleWorkflowOrchestrator:
         # Phase 2 → Phase 3: Automatically continue to image generation
         workflow.add_edge("O1_choice_generation", "PR1_prompt_builder")
         
-        # Phase 3 Flow: PR1 → IMG → A1 → END (pause for user to select image)
+        # Phase 3 Flow: PR1 → IMG → END (pause for user to select concept)
         workflow.add_edge("PR1_prompt_builder", "IMG_generation")
-        workflow.add_edge("IMG_generation", "A1_assembly")
-        workflow.add_edge("A1_assembly", END)  # End here - user selects image/concept
+        workflow.add_edge("IMG_generation", END)  # End here - display 3 concepts, user selects
         
         # Phase 4 triggered manually via /select-concept endpoint
+        # Phase 4 will generate full documentation (BOM, steps, ESG) for selected concept only
 
         # Setup Redis checkpointer for interrupt/resume
         # Note: Checkpointing requires Redis with RedisJSON module
