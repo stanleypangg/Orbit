@@ -304,11 +304,26 @@ export default function Home() {
   };
 
   // Handle workflow concept selection - Add concepts to messages
+  // IMPORTANT: Only show concepts when ALL images are ready
   useEffect(() => {
     if (workflowState.needsSelection && workflowState.selectionType === 'concept' && workflowState.concepts.length > 0) {
+      // Verify that ALL concepts have valid image URLs
+      const allHaveImages = workflowState.concepts.every(c => 
+        c.image_url && c.image_url.trim() !== '' && c.image_url !== 'undefined'
+      );
+      
+      if (!allHaveImages) {
+        console.log('Concepts received but images not ready yet:', workflowState.concepts.map(c => ({
+          title: c.title,
+          hasImage: !!c.image_url
+        })));
+        return; // Don't display yet - wait for images
+      }
+      
       const hasConcepts = messages.some(m => m.concepts && m.concepts.length > 0);
       
       if (!hasConcepts) {
+        console.log('Displaying concepts with images:', workflowState.concepts.map(c => c.title));
         const conceptsId = `concepts-${Date.now()}`;
         setMessages(prev => [
           ...prev,
@@ -322,7 +337,7 @@ export default function Home() {
         setAnimatedMessageIds(prev => new Set([...prev, conceptsId]));
       }
     }
-  }, [workflowState.needsSelection, workflowState.selectionType, workflowState.concepts.length]);
+  }, [workflowState.needsSelection, workflowState.selectionType, workflowState.concepts]);
 
   const handleExampleClick = (text: string) => {
     setPrompt(text);

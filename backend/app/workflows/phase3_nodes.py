@@ -269,42 +269,66 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         }
 
     async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept") -> ConceptVariant:
-        """Generate a single high-quality hero image with rate limiting using FLUX."""
+        """Generate a single high-quality hero image with rate limiting using Gemini."""
         async with semaphore:
             try:
-                # Import image generation service
-                from app.integrations.image_generation import generate_concept_image
+                from google import genai as google_genai
+                from google.genai import types
                 
-                # Generate real AI image using FLUX-schnell (fast & high quality)
-                logger.info(f"IMG: Generating real AI image for {title} ({variant.style})")
-                image_url = await generate_concept_image(
-                    prompt=variant.image_prompt,
-                    style=variant.style,
-                    model="flux-schnell"  # Fast, 4 steps, ~2-3 seconds
+                # Initialize Gemini client for image generation
+                gemini_api_key = os.getenv("GEMINI_API_KEY")
+                if not gemini_api_key:
+                    raise ValueError("GEMINI_API_KEY not found")
+                
+                client = google_genai.Client(api_key=gemini_api_key)
+                
+                logger.info(f"IMG: Calling Gemini to generate {variant.style} image for: {title}")
+                logger.info(f"IMG: Using prompt: {variant.image_prompt[:200]}...")
+                
+                # Call Gemini Nano Banana (gemini-2.5-flash-image) for image generation
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash-image",
+                    contents=[variant.image_prompt]  # Use our detailed hero prompt
                 )
                 
+                logger.info("IMG: Received response from Gemini")
+                
+                # Extract generated image from response
+                image_base64 = None
+                if hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'content') and candidate.content:
+                        if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                            for part in candidate.content.parts:
+                                if hasattr(part, 'inline_data') and part.inline_data is not None:
+                                    logger.info("IMG: ✓ Found generated image in Gemini response")
+                                    image_base64 = base64.b64encode(part.inline_data.data).decode()
+                                    break
+                                elif hasattr(part, 'text') and part.text is not None:
+                                    logger.info(f"IMG: Gemini text response: {part.text[:200]}...")
+                
                 variant.image_id = f"hero_{state.thread_id}_{variant.style}_{int(time.time())}"
-                variant.aesthetic_score = 0.95  # Real AI quality
+                variant.aesthetic_score = 0.95 if image_base64 else 0.5
 
-                # Store image metadata with real generated image URL
+                # Store image metadata with REAL generated image
                 image_key = f"image:{variant.image_id}"
                 image_metadata = {
                     "thread_id": state.thread_id,
                     "style": variant.style,
                     "title": title,
-                    "prompt": variant.image_prompt,  # Full detailed prompt
+                    "prompt": variant.image_prompt,
                     "generated_at": time.time(),
                     "quality": "hero",
-                    "model": "flux-schnell",
-                    "status": "generated" if image_url else "placeholder",
-                    "url": image_url if image_url else None  # Real image URL from Replicate
+                    "model": "gemini-2.5-flash-image",
+                    "status": "generated" if image_base64 else "placeholder",
+                    "base64_data": image_base64 if image_base64 else None  # Store actual image!
                 }
-                redis_service.set(image_key, json.dumps(image_metadata), ex=7200)  # 2 hours TTL
+                redis_service.set(image_key, json.dumps(image_metadata), ex=7200)
 
-                if image_url:
-                    logger.info(f"IMG: ✓ Generated real AI image for {title}: {image_url[:80]}...")
+                if image_base64:
+                    logger.info(f"IMG: ✓ Successfully generated real AI image for {title}")
                 else:
-                    logger.warning(f"IMG: Failed to generate image, using placeholder for {title}")
+                    logger.warning(f"IMG: ✗ No image in Gemini response, will use placeholder for {title}")
                 
                 return variant
 

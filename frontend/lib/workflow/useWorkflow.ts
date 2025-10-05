@@ -180,20 +180,34 @@ export function useWorkflow({
 
           case 'concepts_generated':
             const concepts = data.data.concepts || data.data.concept_variants || [];
+            const mappedConcepts = concepts.map((c: any, idx: number) => ({
+              concept_id: c.concept_id || `concept_${idx}`,
+              title: c.title || c.style || `Concept ${idx + 1}`,
+              image_url: c.image_url || c.url || '',
+              description: c.description,
+              style: c.style,
+            }));
+            
+            // Verify all concepts have image URLs
+            const allHaveImages = mappedConcepts.every((c: any) => c.image_url && c.image_url !== '');
+            console.log('Concepts received:', {
+              count: mappedConcepts.length,
+              allHaveImages,
+              concepts: mappedConcepts.map((c: any) => ({
+                title: c.title,
+                hasImage: !!c.image_url,
+                imageUrl: c.image_url?.substring(0, 50) + '...'
+              }))
+            });
+            
             setState(prev => ({
               ...prev,
-              concepts: concepts.map((c: any, idx: number) => ({
-                concept_id: c.concept_id || `concept_${idx}`,
-                title: c.title || c.style || `Concept ${idx + 1}`,
-                image_url: c.image_url || c.url || '',
-                description: c.description,
-                style: c.style,
-              })),
+              concepts: mappedConcepts,
               phase: 'concept_selection',
-              needsSelection: true,
-              selectionType: 'concept',
-              isLoading: false,
-              loadingMessage: null,
+              needsSelection: allHaveImages, // Only set needsSelection if images are ready
+              selectionType: allHaveImages ? 'concept' : null,
+              isLoading: !allHaveImages, // Keep loading if images not ready
+              loadingMessage: allHaveImages ? null : '🖼️ Finalizing concept images...',
             }));
             break;
 
