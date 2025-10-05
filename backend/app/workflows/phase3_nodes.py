@@ -20,6 +20,9 @@ from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
+# Get API base URL from environment (for image URLs)
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
 # Structured output schemas for Phase 3
 PROMPT_BUILDER_SCHEMA = {
     "type": "object",
@@ -226,56 +229,52 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
 
     # OPTIMIZATION 2: Generate ONLY the first (hero) image immediately
     # Other 2 variants will be generated in background
-    async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore) -> ConceptVariant:
+    async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept") -> ConceptVariant:
         """Generate a single image with rate limiting."""
         async with semaphore:
             try:
-                # Use Gemini image generation
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                # TODO: Integrate real AI image generation API here
+                # Options:
+                # 1. Google Imagen 3 API
+                # 2. Stability AI
+                # 3. DALL-E 3
+                # For now, we create placeholder images that will be served by /images endpoint
 
-                # Build enhanced prompt with style-specific enhancements
-                enhanced_prompt = f"""
-                {variant.image_prompt}
-
-                Style: {variant.style} design
-                Quality: professional photography, high resolution, detailed craftsmanship
-                Context: sustainable upcycling project, eco-friendly materials
-                Composition: clear focus on the final product, good lighting
-                """
-
-                response = await model.generate_content_async([enhanced_prompt])
-
-                # For this implementation, we'll simulate image generation
-                # In production, this would use actual Gemini image generation API
                 variant.image_id = f"generated_{state.thread_id}_{variant.style}_{int(time.time())}"
-                variant.aesthetic_score = 0.8  # Simulated score
+                variant.aesthetic_score = 0.8
 
-                # Store image metadata
+                # Store image metadata with title for placeholder generation
                 image_key = f"image:{variant.image_id}"
                 image_metadata = {
                     "thread_id": state.thread_id,
                     "style": variant.style,
+                    "title": title,  # Add title for placeholder rendering
                     "prompt": variant.image_prompt,
                     "generated_at": time.time(),
-                    "status": "generated"
+                    "status": "placeholder"
+                    # To serve real images, add one of:
+                    # "base64_data": "<base64 encoded image>"  - for inline images
+                    # "url": "<external url>"  - for images hosted elsewhere
                 }
                 redis_service.set(image_key, json.dumps(image_metadata), ex=7200)  # 2 hours TTL
 
-                logger.info(f"IMG: Generated {variant.style} concept image")
+                logger.info(f"IMG: Created placeholder for {variant.style} concept image: {title}")
                 return variant
 
             except Exception as e:
-                logger.error(f"IMG: Failed to generate {variant.style} image: {str(e)}")
+                logger.error(f"IMG: Failed to create image metadata for {variant.style}: {str(e)}")
                 variant.image_id = f"fallback_{state.thread_id}_{variant.style}_{int(time.time())}"
                 variant.aesthetic_score = 0.5
-                # Create synthetic image metadata for downstream steps
+                
+                # Create fallback metadata
                 fallback_metadata = {
                     "thread_id": state.thread_id,
                     "style": variant.style,
+                    "title": title,
                     "prompt": variant.image_prompt,
                     "generated_at": time.time(),
                     "status": "fallback",
-                    "notes": "Offline generation placeholder"
+                    "notes": "Failed to generate image"
                 }
                 redis_service.set(
                     f"image:{variant.image_id}",
@@ -292,8 +291,10 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         logger.info(f"IMG: Generating {len(state.concept_variants)} images sequentially")
         
         for idx, variant in enumerate(state.concept_variants):
-            logger.info(f"IMG: Generating image {idx+1}/{len(state.concept_variants)} ({variant.style})")
-            generated = await generate_single_image(variant, semaphore)
+            # Get the title from the corresponding option
+            title = state.viable_options[idx].get("title", "Concept") if idx < len(state.viable_options) else "Concept"
+            logger.info(f"IMG: Generating image {idx+1}/{len(state.concept_variants)} ({variant.style}): {title}")
+            generated = await generate_single_image(variant, semaphore, title)
             generated_variants.append(generated)
 
         # Filter successful generations
@@ -312,7 +313,8 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         concept_payload = []
         timestamp = time.time()
         for idx, variant in enumerate(state.concept_variants):
-            image_url = variant.image_id or f"fallback://{state.thread_id}/{variant.style}"
+            # Generate proper URL for our images endpoint
+            image_url = f"{API_BASE_URL}/images/{variant.image_id}" if variant.image_id else f"{API_BASE_URL}/images/placeholder/{variant.style}"
             # Match image to its idea
             idea = state.viable_options[idx] if idx < len(state.viable_options) else {}
             

@@ -9,6 +9,7 @@ from app.endpoints.chat.phase_router import router as phase_router
 from app.endpoints.magic_pencil.router import router as magic_pencil_router
 from app.endpoints.workflow.router import router as workflow_router
 from app.endpoints.storyboard import router as storyboard_router
+from app.endpoints.images import router as images_router
 import logging
 
 # Configure logging
@@ -40,6 +41,7 @@ app.include_router(phase_router)
 app.include_router(workflow_router)
 app.include_router(magic_pencil_router)
 app.include_router(storyboard_router, prefix="/api/storyboard", tags=["storyboard"])
+app.include_router(images_router)
 
 @app.get("/")
 async def root():
