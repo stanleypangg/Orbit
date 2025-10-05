@@ -6,12 +6,11 @@ import { useState, useEffect, useRef } from "react";
 
 export default function Home() {
   const router = useRouter();
-  const [animationPhase, setAnimationPhase] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const glowingVideoRef = useRef<HTMLVideoElement>(null);
   const [videoPlayState, setVideoPlayState] = useState<"first" | "looping">(
     "first"
   );
+  const [isFadingOut, setIsFadingOut] = useState(false);
 
   // Prefetch /poc page on mount for faster navigation
   useEffect(() => {
@@ -43,47 +42,13 @@ export default function Home() {
     };
   }, [videoPlayState]);
 
-  // Handle glowing video animation sequence
-  useEffect(() => {
-    const glowingVideo = glowingVideoRef.current;
-    if (!glowingVideo || animationPhase !== 2) return;
-
-    // Pause video immediately on first frame
-    glowingVideo.pause();
-
-    // Phase 3: Start glow effect (immediately)
-    setAnimationPhase(3);
-
-    // After 2 seconds, start zoom
-    const zoomTimeout = setTimeout(() => {
-      setAnimationPhase(4);
-    }, 2000);
-
-    // After zoom completes (2s zoom + 2s pause = 4s total), fade to /poc bg
-    const fadeTimeout = setTimeout(() => {
-      setAnimationPhase(5);
-    }, 4000);
-
-    // Navigate to /poc after fade
-    const navTimeout = setTimeout(() => {
-      router.push("/poc");
-    }, 4500);
-
-    return () => {
-      clearTimeout(zoomTimeout);
-      clearTimeout(fadeTimeout);
-      clearTimeout(navTimeout);
-    };
-  }, [animationPhase, router]);
-
   const handleClick = () => {
-    // Phase 1: Fade out landing content (0-600ms)
-    setAnimationPhase(1);
+    // Fade out landing page
+    setIsFadingOut(true);
 
+    // Navigate after fade completes
     setTimeout(() => {
-      // Phase 2: Show glowing.mp4 fullscreen (600ms)
-      setAnimationPhase(2);
-      // Video will play and trigger phase 3 when it ends
+      router.push("/poc");
     }, 600);
   };
 
@@ -93,7 +58,7 @@ export default function Home() {
       <div
         className="absolute top-8 left-8 z-10 transition-opacity duration-500"
         style={{
-          opacity: animationPhase >= 1 ? 0 : 1,
+          opacity: isFadingOut ? 0 : 1,
         }}
       >
         <Image
@@ -109,8 +74,7 @@ export default function Home() {
       <div
         className="flex flex-col items-center justify-center space-y-12 z-10 transition-opacity duration-500"
         style={{
-          opacity: animationPhase >= 1 ? 0 : 1,
-          pointerEvents: animationPhase >= 1 ? "none" : "auto",
+          opacity: isFadingOut ? 0 : 1,
         }}
       >
         {/* Isometric room video */}
@@ -138,63 +102,6 @@ export default function Home() {
           </p>
         </div>
       </div>
-
-      {/* Glowing video animation */}
-      {animationPhase >= 2 && (
-        <div
-          className="fixed inset-0 z-20 bg-[#0F1922] flex items-center justify-center"
-          style={{
-            opacity: animationPhase === 2 ? 0 : animationPhase >= 5 ? 0 : 1,
-            transition:
-              animationPhase === 2
-                ? "none"
-                : animationPhase === 3
-                ? "opacity 600ms ease-out"
-                : animationPhase >= 5
-                ? "opacity 500ms ease-out"
-                : "none",
-          }}
-        >
-          <div
-            className="relative w-screen h-screen overflow-hidden flex items-center justify-center"
-            style={{
-              transform: animationPhase >= 4 ? "scale(8)" : "scale(1)",
-              transition:
-                animationPhase >= 4
-                  ? "transform 2s cubic-bezier(0.65, 0, 0.35, 1)"
-                  : "none",
-            }}
-          >
-            <video
-              ref={glowingVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-              style={{
-                filter:
-                  animationPhase >= 3 && animationPhase < 4
-                    ? "drop-shadow(0 0 80px rgba(103, 182, 139, 0.8)) drop-shadow(0 0 120px rgba(74, 222, 128, 0.6))"
-                    : "none",
-                transition: "filter 800ms ease-out",
-              }}
-            >
-              <source src="/glowing.mp4" type="video/mp4" />
-            </video>
-          </div>
-        </div>
-      )}
-
-      {/* /poc background color transition layer */}
-      {animationPhase >= 5 && (
-        <div
-          className="fixed inset-0 z-30 bg-[#161924]"
-          style={{
-            opacity: animationPhase >= 5 ? 1 : 0,
-            transition: "opacity 500ms ease-out",
-          }}
-        />
-      )}
 
       {/* Ambient glow effect */}
       <div className="absolute inset-0 bg-gradient-radial from-[#1a2942] via-transparent to-transparent opacity-30" />
