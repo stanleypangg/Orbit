@@ -336,8 +336,14 @@ export default function ProductDetail() {
           {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
             {/* Top: Radar Chart - Square */}
-            <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#67B68B] overflow-hidden flex flex-col items-center justify-center p-8">
-              <div className="w-full max-w-md">
+            <div className="aspect-square bg-gradient-to-br from-[#2A3038] to-[#161924] border border-[#67B68B] relative overflow-hidden flex flex-col items-center justify-center p-8">
+              {/* Corner decorations */}
+              <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#67B68B]" />
+              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#67B68B]" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#67B68B]" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#67B68B]" />
+              
+              <div className="relative w-full max-w-md">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">Impact Stats</div>

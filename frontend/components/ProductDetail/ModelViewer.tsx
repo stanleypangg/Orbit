@@ -30,14 +30,13 @@ function Model({
   const clonedScene = useMemo(() => {
     const cloned = scene.clone();
     
-    // Center the model and lift it to sit on the XY plane
+    // Center the model in 3D space
     const box = new THREE.Box3().setFromObject(cloned);
     const center = box.getCenter(new THREE.Vector3());
-    const yOffset = box.min.y; // Get the bottom of the model
     
-    // Center horizontally and lift vertically to sit on ground
+    // Center the model at origin (0, 0, 0)
     cloned.position.x = -center.x;
-    cloned.position.y = -yOffset; // Lift so bottom is at y=0
+    cloned.position.y = -center.y;
     cloned.position.z = -center.z;
     
     return cloned;
@@ -204,7 +203,7 @@ export default function ModelViewer({
         }
       `}</style>
       <Canvas
-        camera={{ position: [0, 0, 2.5], fov: 50 }}
+        camera={{ position: [2, 1.5, 3.5], fov: 50 }}
         gl={{
           toneMapping: 2, // ACESFilmic tone mapping
           toneMappingExposure: exposure,
