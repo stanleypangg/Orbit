@@ -303,27 +303,6 @@ export default function Home() {
     await selectConcept(conceptId);
   };
 
-  // Handle workflow option selection - Add options to messages
-  useEffect(() => {
-    if (workflowState.needsSelection && workflowState.selectionType === 'option' && workflowState.projectOptions.length > 0) {
-      const hasOptions = messages.some(m => m.projectOptions && m.projectOptions.length > 0);
-      
-      if (!hasOptions) {
-        const optionsId = `options-${Date.now()}`;
-        setMessages(prev => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "I've generated creative project ideas based on your materials! Choose one to continue:",
-            id: optionsId,
-            projectOptions: workflowState.projectOptions,
-          },
-        ]);
-        setAnimatedMessageIds(prev => new Set([...prev, optionsId]));
-      }
-    }
-  }, [workflowState.needsSelection, workflowState.selectionType, workflowState.projectOptions.length]);
-
   // Handle workflow concept selection - Add concepts to messages
   useEffect(() => {
     if (workflowState.needsSelection && workflowState.selectionType === 'concept' && workflowState.concepts.length > 0) {
