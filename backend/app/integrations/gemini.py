@@ -128,28 +128,19 @@ Generate the edited image with changes ONLY in white mask areas."""
             )
             
             logger.info("Received response from Gemini")
-            logger.info(f"Response type: {type(response)}")
-            logger.info(f"Response dir: {dir(response)}")
             
-            # Debug: Log the full response structure
+            # Extract image from response (Nano Banana format)
             if hasattr(response, 'candidates'):
-                logger.info(f"Candidates: {response.candidates}")
                 if response.candidates and len(response.candidates) > 0:
                     candidate = response.candidates[0]
-                    logger.info(f"First candidate: {candidate}")
-                    logger.info(f"Candidate dir: {dir(candidate)}")
                     
                     if hasattr(candidate, 'content'):
-                        logger.info(f"Content: {candidate.content}")
                         if candidate.content and hasattr(candidate.content, 'parts'):
-                            logger.info(f"Parts: {candidate.content.parts}")
                             
-                            # Extract image from response (Nano Banana format)
                             if candidate.content.parts:
                                 for part in candidate.content.parts:
-                                    logger.info(f"Part type: {type(part)}, has text: {hasattr(part, 'text')}, has inline_data: {hasattr(part, 'inline_data')}")
                                     if hasattr(part, 'text') and part.text is not None:
-                                        logger.info(f"Gemini text response: {part.text[:200]}...")
+                                        logger.info("Gemini returned text response (truncated)")
                                     elif hasattr(part, 'inline_data') and part.inline_data is not None:
                                         logger.info("Found generated image in response")
                                         # Convert to base64 data URL
@@ -157,7 +148,6 @@ Generate the edited image with changes ONLY in white mask areas."""
                                         return f"data:image/png;base64,{image_b64}"
             
             logger.warning("No image found in Gemini response - response structure unexpected")
-            logger.warning(f"Full response: {str(response)[:500]}")
             return None
             
         except Exception as e:
