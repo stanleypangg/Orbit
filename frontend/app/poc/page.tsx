@@ -99,10 +99,12 @@ export default function Home() {
   >([]);
   const [pageLoaded, setPageLoaded] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("");
-  
+
   // Phase 3 concept focus mode
   const [isConceptFocusMode, setIsConceptFocusMode] = useState(false);
-  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
+  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(
+    null
+  );
   const [isScrolledAway, setIsScrolledAway] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
@@ -217,8 +219,7 @@ export default function Home() {
   const handleMessagesScroll = () => {
     if (!chatContainerRef.current) return;
 
-    const { scrollTop, scrollHeight, clientHeight } =
-      chatContainerRef.current;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
 
     // Only mark as scrolled if user is NOT at bottom
@@ -301,10 +302,12 @@ export default function Home() {
     setTimeout(() => {
       // Phase 5: Prepare for transition (1800ms) - wait for grow to finish
       setAnimationPhase(5);
+      // Scroll to top to prevent any scroll jumping during transition
+      window.scrollTo({ top: 0, behavior: "instant" });
     }, 1800);
 
     setTimeout(() => {
-      // Phase 6: Switch to chat mode and show first message (1900ms)
+      // Phase 6: Switch to chat mode and show first message (1800ms - same time as phase 5)
       const messageId = Date.now().toString();
       setMessages([
         {
@@ -316,23 +319,21 @@ export default function Home() {
       setAnimatedMessageIds(new Set([messageId]));
       setIsChatMode(true);
       setAnimationPhase(6);
-      // Scroll to top to prevent any scroll jumping during transition
-      window.scrollTo({ top: 0, behavior: "instant" });
-    }, 1900);
+    }, 1800);
 
     setTimeout(() => {
-      // Phase 6.5: Show chat input after chat interface renders (2200ms)
+      // Phase 7: Show chat input after chat interface renders (2200ms)
       setAnimationPhase(7);
     }, 2200);
 
     setTimeout(async () => {
-      // Phase 8: Start workflow
+      // Phase 8: Start workflow after input finishes fading in (3700ms = 2200ms + 1500ms)
       setAnimationPhase(8);
       setIsGenerating(false);
 
       // Start workflow with the initial message
       await startWorkflow(initialMessage);
-    }, 1900);
+    }, 3700);
   };
 
   const handleSendMessage = async () => {
@@ -477,22 +478,22 @@ export default function Home() {
   const handleConceptSelect = async (conceptId: string) => {
     // Set selected concept
     setSelectedConceptId(conceptId);
-    
+
     // Scroll to bottom to reveal confirmation bar after a short delay
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'end'
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
       });
     }, 300);
   };
 
   const handleConceptConfirm = async () => {
     if (!selectedConceptId) return;
-    
+
     // Start transition animation
     setIsTransitioning(true);
-    
+
     // Find the selected concept
     const selectedConcept = workflowState.concepts.find(
       (c) => c.concept_id === selectedConceptId
@@ -590,9 +591,9 @@ export default function Home() {
   };
 
   const handleScrollToConcepts = () => {
-    conceptsRef.current?.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'center' 
+    conceptsRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
     });
     setIsScrolledAway(false);
   };
@@ -645,15 +646,15 @@ export default function Home() {
           },
         ]);
         setAnimatedMessageIds((prev) => new Set([...prev, conceptsId]));
-        
+
         // Enter concept focus mode after a short delay for smooth transition
         setTimeout(() => {
           setIsConceptFocusMode(true);
           // Smooth scroll to concepts
           setTimeout(() => {
-            conceptsRef.current?.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center' 
+            conceptsRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
             });
           }, 300);
         }, 600);
@@ -667,38 +668,43 @@ export default function Home() {
 
   // Scroll detection for concept focus mode (with debouncing to prevent flicker)
   useEffect(() => {
-    if (!isConceptFocusMode || !chatContainerRef.current || !conceptsRef.current) return;
+    if (
+      !isConceptFocusMode ||
+      !chatContainerRef.current ||
+      !conceptsRef.current
+    )
+      return;
 
     let scrollTimeout: NodeJS.Timeout;
 
     const handleScroll = () => {
       if (!chatContainerRef.current || !conceptsRef.current) return;
-      
+
       // Clear existing timeout to debounce
       clearTimeout(scrollTimeout);
-      
+
       // Wait 100ms after scroll ends before updating state
       scrollTimeout = setTimeout(() => {
         if (!chatContainerRef.current || !conceptsRef.current) return;
-        
+
         const containerRect = chatContainerRef.current.getBoundingClientRect();
         const conceptsRect = conceptsRef.current.getBoundingClientRect();
-        
+
         // Check if concepts are out of view (not centered)
         const conceptsCenter = conceptsRect.top + conceptsRect.height / 2;
         const containerCenter = containerRect.top + containerRect.height / 2;
         const distanceFromCenter = Math.abs(conceptsCenter - containerCenter);
-        
+
         // If concepts are more than 200px from center, mark as scrolled away
         setIsScrolledAway(distanceFromCenter > 200);
       }, 100);
     };
 
     const container = chatContainerRef.current;
-    container.addEventListener('scroll', handleScroll);
-    
+    container.addEventListener("scroll", handleScroll);
+
     return () => {
-      container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener("scroll", handleScroll);
       clearTimeout(scrollTimeout);
     };
   }, [isConceptFocusMode]);
@@ -740,9 +746,11 @@ export default function Home() {
           <div
             ref={chatContainerRef}
             onScroll={handleMessagesScroll}
-            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar relative transition-all duration-500 ease-out"
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar relative"
             style={{
-              height: isConceptFocusMode ? "calc(100vh - 180px)" : "calc(100vh - 280px)",
+              height: isConceptFocusMode
+                ? "calc(100vh - 180px)"
+                : "calc(100vh - 280px)",
             }}
           >
             <div className="space-y-4">
@@ -943,10 +951,7 @@ export default function Home() {
 
                     {/* Render Concept Images if present */}
                     {message.concepts && message.concepts.length > 0 && (
-                      <div 
-                        ref={conceptsRef}
-                        className="mt-4"
-                      >
+                      <div ref={conceptsRef} className="mt-4">
                         {/* Focus mode header */}
                         {isConceptFocusMode && (
                           <div className="mb-8 text-center animate-fadeIn">
@@ -958,29 +963,43 @@ export default function Home() {
                             </p>
                           </div>
                         )}
-                        
+
                         <div className="grid grid-cols-3 gap-6">
                           {message.concepts.map((concept) => {
-                            const isSelected = selectedConceptId === concept.concept_id;
-                            const isOtherSelected = selectedConceptId && selectedConceptId !== concept.concept_id;
-                            
+                            const isSelected =
+                              selectedConceptId === concept.concept_id;
+                            const isOtherSelected =
+                              selectedConceptId &&
+                              selectedConceptId !== concept.concept_id;
+
                             return (
                               <div
                                 key={concept.concept_id}
-                                onClick={() => handleConceptSelect(concept.concept_id)}
+                                onClick={() =>
+                                  handleConceptSelect(concept.concept_id)
+                                }
                                 className={`bg-[#1a2030] border-[0.5px] cursor-pointer transition-all duration-300 ${
-                                  isSelected 
-                                    ? 'border-[#4ade80] shadow-[0_0_20px_rgba(74,222,128,0.3)] scale-105 ring-2 ring-[#4ade80]/50' 
+                                  isSelected
+                                    ? "border-[#4ade80] shadow-[0_0_20px_rgba(74,222,128,0.3)] scale-105 ring-2 ring-[#4ade80]/50"
                                     : isOtherSelected
-                                    ? 'border-[#3a4560] opacity-40 scale-95'
-                                    : 'border-[#3a4560] hover:border-[#4ade80] hover:scale-[1.02]'
+                                    ? "border-[#3a4560] opacity-40 scale-95"
+                                    : "border-[#3a4560] hover:border-[#4ade80] hover:scale-[1.02]"
                                 }`}
                                 style={{
-                                  animationName: isConceptFocusMode ? "popIn" : "fadeIn",
-                                  animationDuration: isConceptFocusMode ? "0.6s" : "0.5s",
-                                  animationTimingFunction: isConceptFocusMode ? "cubic-bezier(0.68, -0.55, 0.265, 1.55)" : "ease-out",
+                                  animationName: isConceptFocusMode
+                                    ? "popIn"
+                                    : "fadeIn",
+                                  animationDuration: isConceptFocusMode
+                                    ? "0.6s"
+                                    : "0.5s",
+                                  animationTimingFunction: isConceptFocusMode
+                                    ? "cubic-bezier(0.68, -0.55, 0.265, 1.55)"
+                                    : "ease-out",
                                   animationFillMode: "forwards",
-                                  animationDelay: `${(message.concepts?.indexOf(concept) || 0) * 0.15}s`,
+                                  animationDelay: `${
+                                    (message.concepts?.indexOf(concept) || 0) *
+                                    0.15
+                                  }s`,
                                 }}
                               >
                                 {isSelected && (
@@ -1056,14 +1075,14 @@ export default function Home() {
 
               <div ref={messagesEndRef} />
             </div>
-            
+
             {/* Scroll-away indicator - shows when concepts are out of focus */}
             {isConceptFocusMode && isScrolledAway && !selectedConceptId && (
-              <div 
+              <div
                 className="fixed bottom-24 left-1/2 z-20 animate-fadeIn"
                 style={{
-                  transform: 'translateX(-50%)',
-                  animation: 'fadeIn 0.3s ease-out, bounce 1s infinite 0.3s'
+                  transform: "translateX(-50%)",
+                  animation: "fadeIn 0.3s ease-out, bounce 1s infinite 0.3s",
                 }}
               >
                 <button
@@ -1076,15 +1095,24 @@ export default function Home() {
                 </button>
               </div>
             )}
-            
+
             {/* Transition Overlay */}
             {isTransitioning && (
               <div className="fixed inset-0 bg-[#161924] flex items-center justify-center z-40">
                 <div className="text-center">
                   <div className="flex space-x-2 mb-4 justify-center">
-                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                    <div className="w-4 h-4 bg-[#4ade80] animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                    <div
+                      className="w-4 h-4 bg-[#4ade80] animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    ></div>
+                    <div
+                      className="w-4 h-4 bg-[#4ade80] animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    ></div>
+                    <div
+                      className="w-4 h-4 bg-[#4ade80] animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    ></div>
                   </div>
                   <p className="text-[#4ade80] text-xl font-mono font-semibold animate-pulse">
                     Preparing your project...
@@ -1095,35 +1123,34 @@ export default function Home() {
           </div>
 
           {/* Chat Input - Hidden when in focus mode */}
-          {!isConceptFocusMode && (
-            <div
-              className="mt-4 transition-all duration-700 ease-out"
-              style={{
-                transform:
-                  animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
-                opacity: animationPhase >= 7 ? 1 : 0,
-                pointerEvents: animationPhase >= 7 ? "auto" : "none",
-              }}
-            >
-              <div className="relative">
-                <textarea
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Continue the conversation..."
-                  className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
-                  rows={2}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim() || workflowState.isLoading}
-                  className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
-                >
+          <div
+            className="mt-4 transition-opacity duration-[1500ms] ease-in-out"
+            style={{
+              opacity: isConceptFocusMode ? 0 : animationPhase >= 7 ? 1 : 0.01,
+              pointerEvents:
+                animationPhase >= 7 && !isConceptFocusMode ? "auto" : "none",
+              visibility: animationPhase >= 6 ? "visible" : "hidden",
+            }}
+          >
+            <div className="relative">
+              <textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Continue the conversation..."
+                className="w-full bg-[#232937] text-white text-base border-[0.5px] border-[#4ade80] p-4 pr-14 resize-none focus:outline-none focus:border-[#3bc970] transition-colors placeholder:text-[#B1AFAF] placeholder:font-menlo font-mono"
+                rows={2}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!chatInput.trim() || workflowState.isLoading}
+                className="px-8 py-4 bg-[#4ade80] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase font-mono"
+              >
                 {workflowState.isLoading ? (
                   <span className="flex items-center gap-2">
                     <div className="flex space-x-1">
@@ -1148,7 +1175,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-          )}
 
           {/* Concept Confirmation Button - Shows when concept is selected */}
           {isConceptFocusMode && selectedConceptId && (
@@ -1160,7 +1186,11 @@ export default function Home() {
                       Selected Concept:
                     </p>
                     <p className="text-white text-lg font-semibold font-mono">
-                      {workflowState.concepts.find(c => c.concept_id === selectedConceptId)?.title}
+                      {
+                        workflowState.concepts.find(
+                          (c) => c.concept_id === selectedConceptId
+                        )?.title
+                      }
                     </p>
                   </div>
                   <div className="flex gap-3">
@@ -1179,9 +1209,18 @@ export default function Home() {
                       {isTransitioning ? (
                         <span className="flex items-center gap-2">
                           <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                            <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                            <div
+                              className="w-2 h-2 bg-black animate-bounce"
+                              style={{ animationDelay: "0ms" }}
+                            ></div>
+                            <div
+                              className="w-2 h-2 bg-black animate-bounce"
+                              style={{ animationDelay: "150ms" }}
+                            ></div>
+                            <div
+                              className="w-2 h-2 bg-black animate-bounce"
+                              style={{ animationDelay: "300ms" }}
+                            ></div>
                           </div>
                           <span>Processing</span>
                         </span>
@@ -1197,7 +1236,6 @@ export default function Home() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     );
@@ -1237,7 +1275,7 @@ export default function Home() {
         }}
       >
         {/* Title */}
-        <div className="overflow-hidden text-center mt-12">
+        <div className="overflow-hidden text-center pt-12">
           <h1
             className="text-5xl text-white mb-4 font-semibold transition-all duration-500 ease-out font-mono"
             style={{
@@ -1260,7 +1298,7 @@ export default function Home() {
             marginTop: animationPhase >= 3 ? "0" : "3rem",
             marginBottom: animationPhase >= 3 ? "0" : "2rem",
             transform:
-              animationPhase >= 3 ? "translateY(-50px)" : "translateY(0)",
+              animationPhase >= 3 ? "translateY(-164px)" : "translateY(0)",
           }}
         >
           <div className="relative placeholder:text-[#B1AFAF] placeholder:font-menlo placeholder:tracking-widest">
