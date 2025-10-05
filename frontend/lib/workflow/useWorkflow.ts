@@ -178,7 +178,41 @@ export function useWorkflow({
             }));
             break;
 
+          case 'concept_progress':
+            // PROGRESSIVE UPDATE: Single concept with image just completed!
+            const progressConcept = {
+              concept_id: data.data.concept_id || `concept_${Date.now()}`,
+              title: data.data.title || 'Concept',
+              image_url: data.data.image_url || data.data.url || '',
+              description: data.data.description,
+              style: data.data.style,
+            };
+            
+            console.log('Progressive concept update:', {
+              id: progressConcept.concept_id,
+              title: progressConcept.title,
+              hasImage: !!progressConcept.image_url
+            });
+            
+            // Add or update this specific concept in the array
+            setState(prev => {
+              const existingIndex = prev.concepts.findIndex(c => c.concept_id === progressConcept.concept_id);
+              const updatedConcepts = existingIndex >= 0
+                ? prev.concepts.map((c, i) => i === existingIndex ? progressConcept : c)
+                : [...prev.concepts, progressConcept];
+              
+              return {
+                ...prev,
+                concepts: updatedConcepts,
+                phase: 'concept_selection',
+                isLoading: true, // Keep loading until all arrive
+                loadingMessage: `🎨 Generated ${updatedConcepts.length} of 3 concepts...`,
+              };
+            });
+            break;
+          
           case 'concepts_generated':
+            // ALL CONCEPTS COMPLETE - final batch update
             const concepts = data.data.concepts || data.data.concept_variants || [];
             const mappedConcepts = concepts.map((c: any, idx: number) => ({
               concept_id: c.concept_id || `concept_${idx}`,
@@ -188,9 +222,8 @@ export function useWorkflow({
               style: c.style,
             }));
             
-            // Verify all concepts have image URLs
             const allHaveImages = mappedConcepts.every((c: any) => c.image_url && c.image_url !== '');
-            console.log('Concepts received:', {
+            console.log('All concepts complete:', {
               count: mappedConcepts.length,
               allHaveImages,
               concepts: mappedConcepts.map((c: any) => ({
@@ -204,10 +237,10 @@ export function useWorkflow({
               ...prev,
               concepts: mappedConcepts,
               phase: 'concept_selection',
-              needsSelection: allHaveImages, // Only set needsSelection if images are ready
+              needsSelection: allHaveImages, // Enable selection now
               selectionType: allHaveImages ? 'concept' : null,
-              isLoading: !allHaveImages, // Keep loading if images not ready
-              loadingMessage: allHaveImages ? null : '🖼️ Finalizing concept images...',
+              isLoading: false, // Done loading!
+              loadingMessage: null,
             }));
             break;
 

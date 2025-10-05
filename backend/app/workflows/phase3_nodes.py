@@ -425,6 +425,7 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
 
         state.concept_images = {
             "concepts": concept_payload,
+            "status": "complete",  # Mark as complete for SSE streaming
             "metadata": {
                 "generated_at": timestamp,
                 "thread_id": state.thread_id,
@@ -436,6 +437,7 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         # Save for frontend display (ideas + images together!)
         concepts_key = f"concepts:{state.thread_id}"
         redis_service.set(concepts_key, json.dumps(state.concept_images), ex=3600)
+        logger.info(f"IMG: Saved final concepts payload to Redis with status='complete'")
         
         state.current_node = "COMPLETE"  # End workflow after images (A1 removed)
         logger.info(f"IMG: Successfully generated {len(successful_variants)} HERO images for {len(state.viable_options)} ideas")
