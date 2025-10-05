@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Environment } from "@react-three/drei";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Suspense } from "react";
+import * as THREE from "three";
 
 interface ModelViewerProps {
   modelUrl?: string;
@@ -26,7 +27,21 @@ function Model({
 
   // Clone the scene to avoid modifying cached materials
   // Use useMemo to prevent re-cloning on every render
-  const clonedScene = useMemo(() => scene.clone(), [scene]);
+  const clonedScene = useMemo(() => {
+    const cloned = scene.clone();
+    
+    // Center the model and lift it to sit on the XY plane
+    const box = new THREE.Box3().setFromObject(cloned);
+    const center = box.getCenter(new THREE.Vector3());
+    const yOffset = box.min.y; // Get the bottom of the model
+    
+    // Center horizontally and lift vertically to sit on ground
+    cloned.position.x = -center.x;
+    cloned.position.y = -yOffset; // Lift so bottom is at y=0
+    cloned.position.z = -center.z;
+    
+    return cloned;
+  }, [scene]);
 
   // Store original materials on first render
   useEffect(() => {
@@ -165,7 +180,7 @@ export default function ModelViewer({
   }
 
   return (
-    <div className="bg-[#0a0e14] border-[0.5px] border-[#67B68B] h-full min-h-[400px] relative overflow-hidden">
+    <div className="bg-[#0a0e14] border-[0.5px] border-[#67B68B] w-full h-full relative overflow-hidden">
       {/* Holographic corner accents */}
       <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-[#67B68B] opacity-30" />
       <div className="absolute top-0 right-0 w-20 h-20 border-t-2 border-r-2 border-[#67B68B] opacity-30" />
@@ -189,7 +204,7 @@ export default function ModelViewer({
         }
       `}</style>
       <Canvas
-        camera={{ position: [0, 0, 3], fov: 50 }}
+        camera={{ position: [0, 0, 2.5], fov: 50 }}
         gl={{
           toneMapping: 2, // ACESFilmic tone mapping
           toneMappingExposure: exposure,

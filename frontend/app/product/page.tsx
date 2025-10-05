@@ -273,7 +273,7 @@ export default function ProductDetail() {
         </div>
 
         {/* Top Section: Model Viewer + ESG Impact Split */}
-        <div className="grid grid-cols-[1fr_1fr] gap-6 mb-8">
+        <div className="grid grid-cols-[3fr_2fr] gap-6 mb-8">
           {/* 3D Model Viewer - Square */}
           <div className="aspect-square">
             <ModelViewer
@@ -284,9 +284,9 @@ export default function ProductDetail() {
           </div>
           
           {/* ESG Impact - Split into Graph + Metrics */}
-          <div className="flex flex-col gap-6">
-            {/* Top: Graph */}
-            <div className="flex-1 bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6">
+          <div className="flex flex-col gap-6 h-fit">
+            {/* Top: Graph - Takes remaining space */}
+            <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-6">
               <h3 className="text-[#67B68B] text-lg font-semibold mb-4">Environmental Impact</h3>
               
               {/* Simple Bar Chart */}
@@ -332,23 +332,23 @@ export default function ProductDetail() {
               </div>
             </div>
             
-            {/* Bottom: Metrics Cards */}
-            <div className="flex-1 grid grid-cols-3 gap-4">
-              <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-4 flex flex-col items-center justify-center">
+            {/* Bottom: Metrics Cards - Square */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#67B68B] rounded p-4 flex flex-col items-center justify-center">
                 <div className="text-3xl font-bold text-[#67B68B] mb-1">
                   {productData.esgData.co2EmissionsAvoided}
                 </div>
                 <div className="text-xs text-gray-400 text-center">kg CO₂ Avoided</div>
               </div>
               
-              <div className="bg-[#2A3038] border-[0.5px] border-[#5BA3D0] rounded p-4 flex flex-col items-center justify-center">
+              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#5BA3D0] rounded p-4 flex flex-col items-center justify-center">
                 <div className="text-3xl font-bold text-[#5BA3D0] mb-1">
                   {productData.esgData.waterSaved}
                 </div>
                 <div className="text-xs text-gray-400 text-center">Liters Water Saved</div>
               </div>
               
-              <div className="bg-[#2A3038] border-[0.5px] border-[#4ade80] rounded p-4 flex flex-col items-center justify-center">
+              <div className="aspect-square bg-[#2A3038] border-[0.5px] border-[#4ade80] rounded p-4 flex flex-col items-center justify-center">
                 <div className="text-3xl font-bold text-[#4ade80] mb-1">
                   {productData.esgData.sustainabilityScore}
                 </div>
