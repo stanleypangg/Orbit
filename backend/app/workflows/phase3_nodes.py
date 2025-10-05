@@ -212,22 +212,24 @@ async def prompt_builder_node(state: WorkflowState) -> Dict[str, Any]:
         style_details = style_prompts.get(style_hint.lower(), style_prompts["functional"])
         materials_list = ', '.join(materials[:3]) if materials else "recycled materials"
         
-        # Create detailed hero image prompt
-        hero_prompt = f"""Hero product photography of {project_title}: {project_description}.
+        # Create detailed hero image prompt with CLEAN BACKGROUND focus
+        hero_prompt = f"""Professional product photography of {project_title}: {project_description}.
 
-MATERIALS: Crafted from upcycled {materials_list}, showcasing sustainable design and creative reuse.
+PRODUCT: Crafted from upcycled {materials_list}, showcasing sustainable design and creative reuse. The finished product should be the MAIN and ONLY subject.
 
 STYLE: {style_hint.title()} aesthetic - {style_details['aesthetic']}
 
-COMPOSITION: {style_details['composition']}, professional product photography, 8K resolution, ultra-detailed
+BACKGROUND: Clean, minimal, uncluttered background - solid color, soft gradient, or subtle texture ONLY. NO distracting objects, NO props, NO clutter. Keep focus entirely on the product.
 
-LIGHTING: {style_details['lighting']}, professional studio quality
+COMPOSITION: {style_details['composition']}, isolated product on clean surface, professional product photography, 8K resolution, ultra-detailed. Product occupies 60-80% of frame.
 
-MOOD: {style_details['mood']}, eco-friendly, artisanal craftsmanship
+LIGHTING: {style_details['lighting']}, professional studio lighting that highlights the product details. Clean shadows, no harsh contrasts.
 
-QUALITY: Magazine-quality hero image, commercial photography, photorealistic rendering, sharp focus throughout, professional color grading
+MOOD: {style_details['mood']}, eco-friendly, artisanal craftsmanship. Emphasize the finished product's elegance and simplicity.
 
-CONTEXT: Sustainable upcycling project, waste-to-value transformation, environmentally conscious design"""
+QUALITY: Magazine-quality catalog image, commercial product photography, photorealistic rendering, sharp focus on product, soft-focused or solid background, professional color grading.
+
+IMPORTANT: The upcycled product must be completely finished and polished. Show ONLY the final product, not materials or construction process. Clean, minimal setting."""
         
         variant = ConceptVariant(
             style=style_hint,

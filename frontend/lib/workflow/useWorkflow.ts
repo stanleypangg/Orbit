@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { Ingredient } from "@/lib/chat/types";
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Ingredient } from '@/lib/chat/types';
+import { getProxiedImageUrl } from '@/lib/utils/imageProxy';
 
 interface WorkflowOption {
   option_id: string;
@@ -106,230 +107,216 @@ export function useWorkflow({
     }
   }, []);
 
-  const connectToStream = useCallback(
-    (threadId: string) => {
-      disconnect();
+  const connectToStream = useCallback((threadId: string) => {
+    disconnect();
 
-      const eventSource = new EventSource(
-        `${apiUrl}/workflow/stream/${threadId}`
-      );
-      eventSourceRef.current = eventSource;
+    const eventSource = new EventSource(`${apiUrl}/workflow/stream/${threadId}`);
+    eventSourceRef.current = eventSource;
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'state_update':
+            const currentNode = data.data.current_node;
+            const loadingMessages: Record<string, string> = {
+              'P1a_extract': '🔍 Analyzing your materials with AI...',
+              'P1b_null_check': '🤔 Checking for missing details...',
+              'P1c_categorize': '📦 Organizing ingredients...',
+              'G1_goal_formation': '🎯 Understanding your goals...',
+              'O1_choice_generation': '💡 Generating creative options...',
+              'O1_detailed': '📝 Creating detailed plan for your selection...',
+              'E1_evaluation': '✨ Evaluating feasibility...',
+              'PR1_prompt_builder': '🎨 Crafting concept prompts...',
+              'IMG_hero': '🖼️ Generating your concept image...',
+              'IMG_generation': '🖼️ Generating concept images...',
+            };
+            
+            // KEEP existing loading state during transitions to prevent flickering
+            setState(prev => ({
+              ...prev,
+              currentNode: currentNode,
+              phase: mapBackendPhaseToUI(data.data.current_phase),
+              // Preserve loading state if already loading (e.g., during P1c→G1 transition)
+              isLoading: prev.isLoading !== false ? true : true,
+              // Keep existing message if we have one, otherwise use node-specific message
+              loadingMessage: prev.loadingMessage || loadingMessages[currentNode] || '⚙️ Processing...',
+            }));
+            if (onPhaseChange && data.data.current_phase) {
+              onPhaseChange(data.data.current_phase);
+            }
+            break;
 
-          switch (data.type) {
-            case "state_update":
-              const currentNode = data.data.current_node;
-              const loadingMessages: Record<string, string> = {
-                P1a_extract: "🔍 Analyzing your materials with AI...",
-                P1b_null_check: "🤔 Checking for missing details...",
-                P1c_categorize: "📦 Organizing ingredients...",
-                G1_goal_formation: "🎯 Understanding your goals...",
-                O1_choice_generation: "💡 Generating creative options...",
-                O1_detailed: "📝 Creating detailed plan for your selection...",
-                E1_evaluation: "✨ Evaluating feasibility...",
-                PR1_prompt_builder: "🎨 Crafting concept prompts...",
-                IMG_hero: "🖼️ Generating your concept image...",
-                IMG_generation: "🖼️ Generating concept images...",
+          case 'ingredients_update':
+            const ingredients = data.data.ingredients || [];
+            setState(prev => ({
+              ...prev,
+              ingredients: ingredients.map((ing: any) => ({
+                name: ing.name,
+                size: ing.size,
+                material: ing.material,
+                category: ing.category,
+                condition: ing.condition,
+                confidence: ing.confidence || 0.8,
+              })),
+              phase: 'ingredient_discovery',
+              // KEEP loading state active during P1b→P1c transition after clarification
+              // Only clear when we reach an actual stopping point (user_question, choices_generated)
+              isLoading: prev.isLoading,  // Preserve loading state
+              loadingMessage: prev.loadingMessage,  // Preserve loading message
+            }));
+            break;
+
+          case 'user_question':
+            const questions = Array.isArray(data.data) ? data.data : [data.data];
+            const firstQuestion = typeof questions[0] === 'string' ? questions[0] : String(questions[0]);
+            console.log('Received clarification question:', firstQuestion);
+            setState(prev => ({
+              ...prev,
+              question: firstQuestion,
+              needsInput: true,
+              isLoading: false,  // Only clear loading when we actually get a new question
+              loadingMessage: null,
+            }));
+            break;
+
+          case 'choices_generated':
+            const options = data.data.viable_options || [];
+            setState(prev => ({
+              ...prev,
+              projectOptions: options,
+              phase: 'choice_selection',
+              needsSelection: true,
+              selectionType: 'option',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            break;
+
+          case 'concept_progress':
+            // PROGRESSIVE UPDATE: Single concept with image just completed!
+            const progressConcept = {
+              concept_id: data.data.concept_id || `concept_${Date.now()}`,
+              title: data.data.title || 'Concept',
+              image_url: getProxiedImageUrl(data.data.image_url || data.data.url || ''),
+              description: data.data.description,
+              style: data.data.style,
+            };
+            
+            console.log('Progressive concept update:', {
+              id: progressConcept.concept_id,
+              title: progressConcept.title,
+              hasImage: !!progressConcept.image_url
+            });
+            
+            // Add or update this specific concept in the array
+            setState(prev => {
+              const existingIndex = prev.concepts.findIndex(c => c.concept_id === progressConcept.concept_id);
+              const updatedConcepts = existingIndex >= 0
+                ? prev.concepts.map((c, i) => i === existingIndex ? progressConcept : c)
+                : [...prev.concepts, progressConcept];
+              
+              return {
+                ...prev,
+                concepts: updatedConcepts,
+                phase: 'concept_selection',
+                isLoading: true, // Keep loading until all arrive
+                loadingMessage: `🎨 Generated ${updatedConcepts.length} of 3 concepts...`,
               };
+            });
+            break;
+          
+          case 'concepts_generated':
+            // ALL CONCEPTS COMPLETE - final batch update
+            const concepts = data.data.concepts || data.data.concept_variants || [];
+            const mappedConcepts = concepts.map((c: any, idx: number) => ({
+              concept_id: c.concept_id || `concept_${idx}`,
+              title: c.title || c.style || `Concept ${idx + 1}`,
+              image_url: getProxiedImageUrl(c.image_url || c.url || ''),
+              description: c.description,
+              style: c.style,
+            }));
+            
+            const allHaveImages = mappedConcepts.every((c: any) => c.image_url && c.image_url !== '');
+            console.log('All concepts complete:', {
+              count: mappedConcepts.length,
+              allHaveImages,
+              concepts: mappedConcepts.map((c: any) => ({
+                title: c.title,
+                hasImage: !!c.image_url,
+                imageUrl: c.image_url?.substring(0, 50) + '...'
+              }))
+            });
+            
+            setState(prev => ({
+              ...prev,
+              concepts: mappedConcepts,
+              phase: 'concept_selection',
+              needsSelection: allHaveImages, // Enable selection now
+              selectionType: allHaveImages ? 'concept' : null,
+              isLoading: false, // Done loading!
+              loadingMessage: null,
+            }));
+            break;
 
-              setState((prev) => ({
-                ...prev,
-                currentNode: currentNode,
-                phase: mapBackendPhaseToUI(data.data.current_phase),
-                isLoading: true,
-                loadingMessage:
-                  loadingMessages[currentNode] || "⚙️ Processing...",
-              }));
-              if (onPhaseChange && data.data.current_phase) {
-                onPhaseChange(data.data.current_phase);
-              }
-              break;
+          case 'package_ready':
+          case 'project_package':
+            setState(prev => ({
+              ...prev,
+              finalPackage: data.data,
+              phase: 'complete',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            break;
 
-            case "ingredients_update":
-              const ingredients = data.data.ingredients || [];
-              setState((prev) => ({
-                ...prev,
-                ingredients: ingredients.map((ing: any) => ({
-                  name: ing.name,
-                  size: ing.size,
-                  material: ing.material,
-                  category: ing.category,
-                  condition: ing.condition,
-                  confidence: ing.confidence || 0.8,
-                })),
-                phase: "ingredient_discovery",
-                // DON'T clear loading state here - keep it active until we reach a stopping point
-                // (user_question, choices_generated, etc.)
-              }));
-              break;
+          case 'workflow_complete':
+            setState(prev => ({
+              ...prev,
+              phase: 'complete',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            disconnect();
+            break;
 
-            case "user_question":
-              const questions = Array.isArray(data.data)
-                ? data.data
-                : [data.data];
-              const firstQuestion =
-                typeof questions[0] === "string"
-                  ? questions[0]
-                  : String(questions[0]);
-              console.log("Received clarification question:", firstQuestion);
-              setState((prev) => ({
-                ...prev,
-                question: firstQuestion,
-                needsInput: true,
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              break;
+          case 'error':
+            setState(prev => ({
+              ...prev,
+              error: data.data?.error || data.message || 'An error occurred',
+              phase: 'error',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            break;
 
-            case "choices_generated":
-              const options = data.data.viable_options || [];
-              setState((prev) => ({
-                ...prev,
-                projectOptions: options,
-                phase: "choice_selection",
-                needsSelection: true,
-                selectionType: "option",
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              break;
-
-            case "concept_progress":
-              // PROGRESSIVE UPDATE: Single concept with image just completed!
-              const progressConcept = {
-                concept_id: data.data.concept_id || `concept_${Date.now()}`,
-                title: data.data.title || "Concept",
-                image_url: data.data.image_url || data.data.url || "",
-                description: data.data.description,
-                style: data.data.style,
-              };
-
-              console.log("Progressive concept update:", {
-                id: progressConcept.concept_id,
-                title: progressConcept.title,
-                hasImage: !!progressConcept.image_url,
-              });
-
-              // Add or update this specific concept in the array
-              setState((prev) => {
-                const existingIndex = prev.concepts.findIndex(
-                  (c) => c.concept_id === progressConcept.concept_id
-                );
-                const updatedConcepts =
-                  existingIndex >= 0
-                    ? prev.concepts.map((c, i) =>
-                        i === existingIndex ? progressConcept : c
-                      )
-                    : [...prev.concepts, progressConcept];
-
-                return {
-                  ...prev,
-                  concepts: updatedConcepts,
-                  phase: "concept_selection",
-                  isLoading: true, // Keep loading until all arrive
-                  loadingMessage: `🎨 Generated ${updatedConcepts.length} of 3 concepts...`,
-                };
-              });
-              break;
-
-            case "concepts_generated":
-              // ALL CONCEPTS COMPLETE - final batch update
-              const concepts =
-                data.data.concepts || data.data.concept_variants || [];
-              const mappedConcepts = concepts.map((c: any, idx: number) => ({
-                concept_id: c.concept_id || `concept_${idx}`,
-                title: c.title || c.style || `Concept ${idx + 1}`,
-                image_url: c.image_url || c.url || "",
-                description: c.description,
-                style: c.style,
-              }));
-
-              const allHaveImages = mappedConcepts.every(
-                (c: any) => c.image_url && c.image_url !== ""
-              );
-              console.log("All concepts complete:", {
-                count: mappedConcepts.length,
-                allHaveImages,
-                concepts: mappedConcepts.map((c: any) => ({
-                  title: c.title,
-                  hasImage: !!c.image_url,
-                  imageUrl: c.image_url?.substring(0, 50) + "...",
-                })),
-              });
-
-              setState((prev) => ({
-                ...prev,
-                concepts: mappedConcepts,
-                phase: "concept_selection",
-                needsSelection: allHaveImages, // Enable selection now
-                selectionType: allHaveImages ? "concept" : null,
-                isLoading: false, // Done loading!
-                loadingMessage: null,
-              }));
-              break;
-
-            case "package_ready":
-            case "project_package":
-              setState((prev) => ({
-                ...prev,
-                finalPackage: data.data,
-                phase: "complete",
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              break;
-
-            case "workflow_complete":
-              setState((prev) => ({
-                ...prev,
-                phase: "complete",
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              disconnect();
-              break;
-
-            case "error":
-              setState((prev) => ({
-                ...prev,
-                error: data.data?.error || data.message || "An error occurred",
-                phase: "error",
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              break;
-
-            case "timeout":
-              setState((prev) => ({
-                ...prev,
-                error: "Workflow timeout",
-                phase: "error",
-                isLoading: false,
-                loadingMessage: null,
-              }));
-              disconnect();
-              break;
-          }
-        } catch (error) {
-          console.error("Failed to parse SSE event:", error);
+          case 'timeout':
+            setState(prev => ({
+              ...prev,
+              error: 'Workflow timeout',
+              phase: 'error',
+              isLoading: false,
+              loadingMessage: null,
+            }));
+            disconnect();
+            break;
         }
-      };
+      } catch (error) {
+        console.error('Failed to parse SSE event:', error);
+      }
+    };
 
-      eventSource.onerror = (error) => {
-        console.error("SSE error:", error);
-        setState((prev) => ({
-          ...prev,
-          error: "Connection error",
-          phase: "error",
-        }));
-        disconnect();
-      };
-    },
-    [apiUrl, disconnect, onPhaseChange]
-  );
+    eventSource.onerror = (error) => {
+      console.error('SSE error:', error);
+      setState(prev => ({
+        ...prev,
+        error: 'Connection error',
+        phase: 'error',
+      }));
+      disconnect();
+    };
+  }, [apiUrl, disconnect, onPhaseChange]);
 
   const startWorkflow = useCallback(
     async (userInput: string) => {
@@ -432,12 +419,13 @@ export function useWorkflow({
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // The SSE stream will handle updates
+        // Keep loading state - SSE stream will update when workflow actually progresses
       } catch (error: any) {
         setState((prev) => ({
           ...prev,
           error: error.message || "Failed to resume workflow",
           phase: "error",
+          isLoading: false,
         }));
       }
     },

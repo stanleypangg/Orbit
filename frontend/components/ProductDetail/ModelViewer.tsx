@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Environment } from "@react-three/drei";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Suspense } from "react";
+import * as THREE from "three";
 
 interface ModelViewerProps {
   modelUrl?: string;
@@ -26,7 +27,20 @@ function Model({
 
   // Clone the scene to avoid modifying cached materials
   // Use useMemo to prevent re-cloning on every render
-  const clonedScene = useMemo(() => scene.clone(), [scene]);
+  const clonedScene = useMemo(() => {
+    const cloned = scene.clone();
+    
+    // Center the model in 3D space
+    const box = new THREE.Box3().setFromObject(cloned);
+    const center = box.getCenter(new THREE.Vector3());
+    
+    // Center the model at origin (0, 0, 0)
+    cloned.position.x = -center.x;
+    cloned.position.y = -center.y;
+    cloned.position.z = -center.z;
+    
+    return cloned;
+  }, [scene]);
 
   // Store original materials on first render
   useEffect(() => {
@@ -45,29 +59,30 @@ function Model({
     clonedScene.traverse((child: any) => {
       if (child.isMesh && child.material) {
         const originalMaterial = originalMaterials.get(child);
+        
+        if (!originalMaterial) return;
 
         if (wireframe) {
-          // Wireframe mode: filled green with shading
-          child.material = child.material.clone();
-          child.material.wireframe = false;
-          child.material.color.set("#67B68B");
-          child.material.emissive?.set("#000000");
-
+          // Wireframe mode: holographic green wireframe
+          // Clone from original to avoid stale state
+          const wireMaterial = originalMaterial.clone();
+          wireMaterial.wireframe = true;
+          wireMaterial.color.set("#67B68B"); // Holographic green
+          if (wireMaterial.emissive) wireMaterial.emissive.set("#67B68B"); // Glowing effect
+          
           // Only set these if the material supports them
-          if ("metalness" in child.material) child.material.metalness = 0.2;
-          if ("roughness" in child.material) child.material.roughness = 0.8;
-          if ("flatShading" in child.material)
-            child.material.flatShading = false;
+          if ("metalness" in wireMaterial) wireMaterial.metalness = 0.3;
+          if ("roughness" in wireMaterial) wireMaterial.roughness = 0.7;
+          if ("emissiveIntensity" in wireMaterial) wireMaterial.emissiveIntensity = 0.2;
 
-          child.material.needsUpdate = true;
-        } else if (showColor && originalMaterial) {
-          // Color mode: restore original material
-          child.material = originalMaterial.clone();
-          child.material.needsUpdate = true;
-        } else if (originalMaterial) {
-          // Neither mode: use original material
-          child.material = originalMaterial.clone();
-          child.material.needsUpdate = true;
+          wireMaterial.needsUpdate = true;
+          child.material = wireMaterial;
+        } else {
+          // Base Texture Mode: restore original material with full color
+          const colorMaterial = originalMaterial.clone();
+          colorMaterial.wireframe = false; // Explicitly disable wireframe
+          colorMaterial.needsUpdate = true;
+          child.material = colorMaterial;
         }
       }
     });
@@ -85,12 +100,8 @@ function Model({
 }
 
 function LoadingPlaceholder() {
-  return (
-    <mesh>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#4ade80" wireframe />
-    </mesh>
-  );
+  // Return null to prevent cube from flashing
+  return null;
 }
 
 function LoadingSkeleton() {
@@ -144,8 +155,10 @@ export default function ModelViewer({
   const [contrast, setContrast] = useState(3.0);
   const [exposure, setExposure] = useState(2.0);
   const [wireframe, setWireframe] = useState(true); // Default: wireframe ON
-  const [showColor, setShowColor] = useState(false); // Default: color OFF
+  const [showColor, setShowColor] = useState(false); // Default: Base Texture Mode OFF
   const [autoRotate, setAutoRotate] = useState(true); // Default: auto-rotate ON
+  const [lightingMode, setLightingMode] = useState<"studio" | "sunset" | "warehouse" | "forest">("studio");
+  const [showLightingDropdown, setShowLightingDropdown] = useState(false);
 
   // Show loading skeleton while generating
   if (isLoading) {
@@ -166,19 +179,53 @@ export default function ModelViewer({
   }
 
   return (
-    <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] h-full min-h-[400px] relative">
+    <div className="bg-[#0a0e14] border-[0.5px] border-[#67B68B] w-full h-full relative overflow-hidden">
+      {/* Holographic corner accents */}
+      <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-[#67B68B] opacity-30" />
+      <div className="absolute top-0 right-0 w-20 h-20 border-t-2 border-r-2 border-[#67B68B] opacity-30" />
+      <div className="absolute bottom-0 left-0 w-20 h-20 border-b-2 border-l-2 border-[#67B68B] opacity-30" />
+      <div className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-[#67B68B] opacity-30" />
+      
+      {/* Scan line effect */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(0deg, transparent 0%, rgba(103, 182, 139, 0.03) 50%, transparent 100%)',
+          backgroundSize: '100% 4px',
+          animation: 'scan 8s linear infinite',
+        }}
+      />
+      
+      <style jsx>{`
+        @keyframes scan {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(100%); }
+        }
+      `}</style>
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 50 }}
+        camera={{ position: [2, 1.5, 3.5], fov: 50 }}
         gl={{
           toneMapping: 2, // ACESFilmic tone mapping
           toneMappingExposure: exposure,
         }}
       >
-        <color attach="background" args={["#2A3038"]} />
+        {/* Terminal/Holographic background gradient */}
+        <color attach="background" args={["#0a0e14"]} />
+        
+        {/* Holographic grid effect */}
+        <mesh position={[0, 0, -10]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[50, 50, 20, 20]} />
+          <meshBasicMaterial 
+            color="#67B68B" 
+            wireframe 
+            transparent 
+            opacity={0.08}
+          />
+        </mesh>
 
         <Suspense fallback={<LoadingPlaceholder />}>
           {/* HDR Environment for PBR materials */}
-          <Environment preset="studio" background={false} />
+          <Environment preset={lightingMode} background={false} />
 
           {/* Additional subtle lighting with contrast control */}
           <ambientLight intensity={0.5 * contrast} />
@@ -212,60 +259,22 @@ export default function ModelViewer({
         </Suspense>
       </Canvas>
 
-      {/* Toggle Panel - Top Left */}
-      <div className="absolute top-4 left-4 flex gap-2">
-        {/* Wireframe Toggle */}
+      {/* Top Controls Row */}
+      <div className="absolute top-4 left-4 flex gap-3">
+        {/* View Mode Selector */}
+        <div className="bg-[#161924] border-[0.5px] border-[#3a4560] rounded flex overflow-hidden">
+        {/* Base Texture Mode */}
         <button
           onClick={() => {
-            if (!wireframe) {
-              // Enable wireframe, disable color
-              setWireframe(true);
-              setShowColor(false);
-            } else {
-              // Disable wireframe
-              setWireframe(false);
-            }
+            setShowColor(true);
+            setWireframe(false);
           }}
-          className={`w-10 h-10 border-[0.5px] border-[#67B68B] flex items-center justify-center transition ${
-            wireframe
-              ? "bg-[#67B68B] text-black"
-              : "bg-[#2A3142] hover:bg-[#3a4560] text-[#67B68B]"
-          }`}
-          title={wireframe ? "Disable Wireframe" : "Enable Wireframe"}
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7h4V5a1 1 0 011-1h4a1 1 0 011 1v13a1 1 0 01-1 1h-4a1 1 0 01-1-1v-7h-4v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5z"
-            />
-          </svg>
-        </button>
-
-        {/* Color Toggle */}
-        <button
-          onClick={() => {
-            if (!showColor) {
-              // Enable color, disable wireframe
-              setShowColor(true);
-              setWireframe(false);
-            } else {
-              // Disable color
-              setShowColor(false);
-            }
-          }}
-          className={`w-10 h-10 border-[0.5px] border-[#67B68B] flex items-center justify-center transition ${
+          className={`w-12 h-12 flex items-center justify-center transition-colors ${
             showColor
               ? "bg-[#67B68B] text-black"
-              : "bg-[#2A3142] hover:bg-[#3a4560] text-[#67B68B]"
+              : "bg-transparent text-[#67B68B] hover:bg-[#2A3142]"
           }`}
-          title={showColor ? "Disable Color" : "Enable Color"}
+          title="Base Texture Mode"
         >
           <svg
             className="w-5 h-5"
@@ -282,15 +291,21 @@ export default function ModelViewer({
           </svg>
         </button>
 
-        {/* Auto-Rotate Toggle */}
+        {/* Divider */}
+        <div className="w-[1px] bg-[#3a4560]" />
+
+        {/* Wireframe Mode */}
         <button
-          onClick={() => setAutoRotate(!autoRotate)}
-          className={`w-10 h-10 border-[0.5px] border-[#67B68B] flex items-center justify-center transition ${
-            autoRotate
+          onClick={() => {
+            setWireframe(true);
+            setShowColor(false);
+          }}
+          className={`w-12 h-12 flex items-center justify-center transition-colors ${
+            wireframe
               ? "bg-[#67B68B] text-black"
-              : "bg-[#2A3142] hover:bg-[#3a4560] text-[#67B68B]"
+              : "bg-transparent text-[#67B68B] hover:bg-[#2A3142]"
           }`}
-          title={autoRotate ? "Stop Auto-Rotate" : "Start Auto-Rotate"}
+          title="Wireframe Mode"
         >
           <svg
             className="w-5 h-5"
@@ -302,18 +317,77 @@ export default function ModelViewer({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              d="M4 6h16M4 10h16M4 14h16M4 18h16"
             />
           </svg>
         </button>
+        </div>
+        
+        {/* Lighting Mode Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLightingDropdown(!showLightingDropdown)}
+            className="bg-[#161924] border-[0.5px] border-[#3a4560] rounded px-3 h-12 flex items-center gap-2 text-[#67B68B] hover:bg-[#2A3142] transition-colors"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
+            <span className="text-sm capitalize">{lightingMode}</span>
+            <svg
+              className={`w-4 h-4 transition-transform ${showLightingDropdown ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          
+          {/* Dropdown Menu */}
+          {showLightingDropdown && (
+            <div className="absolute top-14 left-0 bg-[#161924] border-[0.5px] border-[#3a4560] rounded overflow-hidden z-10 min-w-[140px]">
+              {(['studio', 'sunset', 'warehouse', 'forest'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setLightingMode(mode);
+                    setShowLightingDropdown(false);
+                  }}
+                  className={`w-full px-4 py-2.5 text-left text-sm capitalize transition-colors ${
+                    lightingMode === mode
+                      ? 'bg-[#67B68B] text-black'
+                      : 'text-[#67B68B] hover:bg-[#2A3142]'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Control Panel - Right Side */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
+      {/* Vertical Control Stack - Right Side */}
+      <div className="absolute top-1/2 right-4 -translate-y-1/2 bg-[#2A3038] border-[0.5px] border-[#3a4560] rounded flex flex-col overflow-hidden">
         {/* Reset Camera */}
         <button
           onClick={() => controlsRef.current?.reset()}
-          className="w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center text-[#67B68B] transition"
+          className="w-12 h-12 flex items-center justify-center text-[#67B68B] hover:bg-[#3a4560] transition-colors border-b border-[#3a4560]"
           title="Reset Camera"
         >
           <svg
@@ -340,20 +414,21 @@ export default function ModelViewer({
               controlsRef.current.update();
             }
           }}
-          className="w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center text-[#67B68B] transition"
+          className="w-12 h-12 flex items-center justify-center text-[#67B68B] hover:bg-[#3a4560] transition-colors border-b border-[#3a4560]"
           title="Zoom In"
         >
           <svg
-            className="w-5 h-5"
+            className="w-6 h-6"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
+            <circle cx="11" cy="11" r="8" strokeWidth={2} />
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"
+              d="M21 21l-4.35-4.35M11 8v6m-3-3h6"
             />
           </svg>
         </button>
@@ -367,34 +442,45 @@ export default function ModelViewer({
               controlsRef.current.update();
             }
           }}
-          className="w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center text-[#67B68B] transition"
+          className="w-12 h-12 flex items-center justify-center text-[#67B68B] hover:bg-[#3a4560] transition-colors border-b border-[#3a4560]"
           title="Zoom Out"
         >
           <svg
-            className="w-5 h-5"
+            className="w-6 h-6"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
+            <circle cx="11" cy="11" r="8" strokeWidth={2} />
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
+              d="M21 21l-4.35-4.35M8 11h6"
             />
           </svg>
         </button>
 
-        {/* Center Dot Indicator */}
-        <div className="w-10 h-10 bg-[#67B68B]/20 border-[0.5px] border-[#67B68B] flex items-center justify-center">
-          <div className="w-2 h-2 bg-[#67B68B] rounded-full"></div>
-        </div>
+        {/* Auto-Rotate Toggle (Dot Button) */}
+        <button
+          onClick={() => setAutoRotate(!autoRotate)}
+          className={`w-12 h-12 flex items-center justify-center transition-colors border-b border-[#3a4560] ${
+            autoRotate ? "bg-[#67B68B]/20" : "hover:bg-[#3a4560]"
+          }`}
+          title={autoRotate ? "Stop Auto-Rotate" : "Start Auto-Rotate"}
+        >
+          <div
+            className={`w-3 h-3 rounded-full transition-colors ${
+              autoRotate ? "bg-[#67B68B]" : "bg-[#67B68B]/40"
+            }`}
+          />
+        </button>
 
         {/* Increase Contrast */}
         <button
           onClick={() => setContrast(Math.min(contrast + 0.3, 5.0))}
-          className="w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center text-[#67B68B] transition"
-          title="Increase Contrast"
+          className="w-12 h-12 flex items-center justify-center text-[#67B68B] hover:bg-[#3a4560] transition-colors border-b border-[#3a4560]"
+          title="Increase Brightness"
         >
           <svg
             className="w-5 h-5"
@@ -415,8 +501,8 @@ export default function ModelViewer({
         {/* Decrease Contrast */}
         <button
           onClick={() => setContrast(Math.max(contrast - 0.3, 0.5))}
-          className="w-10 h-10 bg-[#2A3142] hover:bg-[#3a4560] border-[0.5px] border-[#67B68B] flex items-center justify-center text-[#67B68B] transition"
-          title="Decrease Contrast"
+          className="w-12 h-12 flex items-center justify-center text-[#67B68B] hover:bg-[#3a4560] transition-colors"
+          title="Decrease Brightness"
         >
           <svg
             className="w-5 h-5"

@@ -38,7 +38,6 @@ interface Message {
   content: string;
   id: string;
   ingredients?: Ingredient[];
-  needsClarification?: boolean;
   clarifyingQuestions?: string[];
   projectOptions?: WorkflowOption[];
   concepts?: WorkflowConcept[];
@@ -226,7 +225,6 @@ export default function Home() {
             content: "I've analyzed your materials! Here's what I found:",
             id: assistantId,
             ingredients: workflowState.ingredients,
-            needsClarification: workflowState.needsInput,
             clarifyingQuestions: workflowState.question
               ? [workflowState.question]
               : [],
@@ -259,7 +257,6 @@ export default function Home() {
           role: "assistant" as const,
           content: workflowState.question!, // Use the question as the main content
           id: questionId,
-          needsClarification: true,
           clarifyingQuestions: [workflowState.question!],
         };
         console.log("Adding question message:", newMessage);
@@ -321,12 +318,57 @@ export default function Home() {
       return;
     }
 
+    // OPTIMIZATION: Start 3D generation in background IMMEDIATELY
+    // This runs in parallel with Phase 4 packaging
+    const threadId = workflowState.threadId;
+    if (threadId && selectedConcept.image_url) {
+      console.log("[Parallel] Starting 3D generation in background...");
+      
+      // Convert proxy URL to data URL for Trellis
+      fetch(selectedConcept.image_url)
+        .then(res => res.blob())
+        .then(blob => new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        }))
+        .then(dataUrl => {
+          // Trigger async Trellis generation (fire-and-forget)
+          return fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate-async/${threadId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                images: [dataUrl],
+                seed: 1337,
+                randomize_seed: false,
+                texture_size: 2048,
+                mesh_simplify: 0.96,
+                generate_color: true,
+                generate_normal: false,
+                generate_model: true,
+                save_gaussian_ply: false,
+                return_no_background: true,
+                ss_sampling_steps: 26,
+                ss_guidance_strength: 8.0,
+                slat_sampling_steps: 26,
+                slat_guidance_strength: 3.2,
+              }),
+            }
+          );
+        })
+        .then(() => console.log("[Parallel] ✓ 3D generation triggered in background"))
+        .catch(err => console.error("[Parallel] Failed to trigger 3D generation:", err));
+    }
+
     // Trigger Phase 4 packaging in background (don't await)
     selectConcept(conceptId); // No await - runs in background
 
     // Immediately navigate to Magic Pencil with the hero image
+    // Note: image_url is already proxied via useWorkflow for optimal caching
     const params = new URLSearchParams({
-      imageUrl: selectedConcept.image_url,
+      imageUrl: selectedConcept.image_url, // Already proxied: /api/images/{imageId}
       title: selectedConcept.title,
       threadId: workflowState.threadId || "",
       conceptId: conceptId,
@@ -516,32 +558,24 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Clarifying Questions - Always show if needsClarification is true */}
-                        {message.needsClarification && (
+                        {/* Clarifying Questions - Show when there are questions in the array */}
+                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && (
                           <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 rounded-lg p-4 mt-2">
                             <h3 className="text-yellow-400 text-lg font-semibold mb-2">
                               ❓ Please Answer
                             </h3>
-                            {message.clarifyingQuestions &&
-                            message.clarifyingQuestions.length > 0 ? (
-                              <ul className="space-y-2">
-                                {message.clarifyingQuestions.map(
-                                  (question, idx) => (
-                                    <li
-                                      key={idx}
-                                      className="text-yellow-200 text-sm"
-                                    >
-                                      • {question}
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            ) : (
-                              <p className="text-yellow-200 text-sm">
-                                Please provide the requested information in the
-                                input below.
-                              </p>
-                            )}
+                            <ul className="space-y-2">
+                              {message.clarifyingQuestions.map(
+                                (question, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="text-yellow-200 text-sm"
+                                  >
+                                    • {question}
+                                  </li>
+                                )
+                              )}
+                            </ul>
                           </div>
                         )}
                       </div>

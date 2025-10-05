@@ -12,6 +12,7 @@
     "@react-three/fiber": "^9.3.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "lucide-react": "^0.544.0",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
