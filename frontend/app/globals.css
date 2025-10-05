@@ -8,6 +8,21 @@
   font-display: swap;
 }
 
+/* Hide browser scrollbar while keeping scroll functionality */
+html {
+  overflow-y: scroll;
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+html::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+body {
+  overflow-x: hidden;
+}
+
 @layer utilities {
   .bg-gradient-radial {
     background: radial-gradient(circle, var(--tw-gradient-stops));

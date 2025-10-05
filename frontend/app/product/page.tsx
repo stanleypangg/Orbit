@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import ESGImpact from "@/components/ProductDetail/ESGImpact";
 import ModelViewer from "@/components/ProductDetail/ModelViewer";
 import MaterialsCarousel from "@/components/ProductDetail/MaterialsCarousel";
@@ -85,43 +86,93 @@ const productData = {
 };
 
 export default function ProductDetail() {
+  const [imageUrl, setImageUrl] = useState<string>("/pikachu.webp");
+  const [modelUrl, setModelUrl] = useState<string | undefined>(undefined);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Get image from localStorage on mount
+  useEffect(() => {
+    const storedImage = localStorage.getItem("productImage");
+    if (storedImage) {
+      setImageUrl(storedImage);
+      // Clean up after reading
+      localStorage.removeItem("productImage");
+    }
+  }, []);
+
+  useEffect(() => {
+    const generate3DModel = async () => {
+      if (!imageUrl) return;
+
+      setIsGenerating(true);
+      setError(null);
+
+      try {
+        // Convert local image path to full URL or data URL
+        let processedImageUrl = imageUrl;
+
+        // If it's a local path (starts with /), convert to data URL
+        if (imageUrl.startsWith("/") && !imageUrl.startsWith("http")) {
+          // Fetch the local image and convert to data URL
+          const imgResponse = await fetch(imageUrl);
+          const blob = await imgResponse.blob();
+          processedImageUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        const response = await fetch("http://localhost:8000/trellis/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            images: [processedImageUrl],
+            seed: 1337,
+            randomize_seed: false,
+            texture_size: 2048,
+            mesh_simplify: 0.96,
+            generate_color: true,
+            generate_normal: false,
+            generate_model: true,
+            save_gaussian_ply: false,
+            return_no_background: true,
+            ss_sampling_steps: 26,
+            ss_guidance_strength: 8.0,
+            slat_sampling_steps: 26,
+            slat_guidance_strength: 3.2,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || "Failed to generate 3D model");
+        }
+
+        const data = await response.json();
+        if (data.model_file) {
+          setModelUrl(data.model_file);
+        }
+      } catch (err) {
+        console.error("Error generating 3D model:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to generate 3D model"
+        );
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    generate3DModel();
+  }, [imageUrl]);
+
   return (
     <div className="min-h-screen bg-[#161924] font-menlo">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-8">
-        {/* Logo and Navigation */}
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/poc">
-            <Image
-              src="/logo_text.svg"
-              alt="Orbit"
-              width={80}
-              height={27}
-              className="opacity-90 cursor-pointer"
-            />
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/poc"
-              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-            >
-              ← Back to Chat
-            </Link>
-            <Link
-              href="/poc/trellis"
-              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-            >
-              Try Trellis 3D Generator →
-            </Link>
-            <Link
-              href="/poc/magic-pencil"
-              className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-            >
-              Try Magic Pencil ✨ →
-            </Link>
-          </div>
-        </div>
-
         {/* Product Header */}
         <div className="mb-8">
           <h1 className="text-4xl text-white mb-2">{productData.name}</h1>
@@ -130,7 +181,11 @@ export default function ProductDetail() {
 
         {/* Top Section: Model Viewer + ESG Impact */}
         <div className="grid grid-cols-2 gap-6 mb-8">
-          <ModelViewer modelUrl={productData.modelUrl} />
+          <ModelViewer
+            modelUrl={modelUrl}
+            isLoading={isGenerating}
+            error={error}
+          />
           <ESGImpact {...productData.esgData} />
         </div>
 

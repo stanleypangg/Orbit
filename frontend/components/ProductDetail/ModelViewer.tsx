@@ -8,6 +8,8 @@ import { Suspense } from "react";
 
 interface ModelViewerProps {
   modelUrl?: string;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 function Model({ url }: { url: string }) {
@@ -24,10 +26,74 @@ function LoadingPlaceholder() {
   );
 }
 
-export default function ModelViewer({ modelUrl }: ModelViewerProps) {
+function LoadingSkeleton() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#2A3038]">
+      <div className="text-center">
+        <div className="mb-4">
+          <div className="w-16 h-16 border-4 border-[#4ade80] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+        <p className="text-[#67B68B] text-lg font-semibold mb-2">
+          Generating 3D Model
+        </p>
+        <p className="text-gray-400 text-sm">This may take a few moments...</p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorDisplay({ message }: { message: string }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#2A3038]">
+      <div className="text-center px-8">
+        <div className="mb-4">
+          <svg
+            className="w-16 h-16 text-red-500 mx-auto"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <p className="text-red-400 text-lg font-semibold mb-2">Error</p>
+        <p className="text-gray-400 text-sm">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function ModelViewer({
+  modelUrl,
+  isLoading,
+  error,
+}: ModelViewerProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const [contrast, setContrast] = useState(3.0);
   const [exposure, setExposure] = useState(2.0);
+
+  // Show loading skeleton while generating
+  if (isLoading) {
+    return (
+      <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] h-full min-h-[400px] relative">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  // Show error if generation failed
+  if (error) {
+    return (
+      <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] h-full min-h-[400px] relative">
+        <ErrorDisplay message={error} />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#2A3038] border-[0.5px] border-[#67B68B] h-full min-h-[400px] relative">

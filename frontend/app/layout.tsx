@@ -18,6 +18,10 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="font-menlo">
+      <head>
+        <title>Orbit</title>
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+      </head>
       <body className="antialiased">
         {showLogo && (
           <header className="block w-full bg-[#161924] pt-6 pb-4 pl-10">
