@@ -46,20 +46,36 @@ interface Message {
 // Helper function to extract which field the question is asking about
 const getFieldFromQuestion = (question: string): string => {
   const lowerQuestion = question.toLowerCase();
-  
-  if (lowerQuestion.includes("size") || lowerQuestion.includes("how big") || lowerQuestion.includes("how large")) {
+
+  if (
+    lowerQuestion.includes("size") ||
+    lowerQuestion.includes("how big") ||
+    lowerQuestion.includes("how large")
+  ) {
     return "size";
   }
-  if (lowerQuestion.includes("material") || lowerQuestion.includes("made of") || lowerQuestion.includes("what type")) {
+  if (
+    lowerQuestion.includes("material") ||
+    lowerQuestion.includes("made of") ||
+    lowerQuestion.includes("what type")
+  ) {
     return "material";
   }
-  if (lowerQuestion.includes("category") || lowerQuestion.includes("type of item") || lowerQuestion.includes("what kind")) {
+  if (
+    lowerQuestion.includes("category") ||
+    lowerQuestion.includes("type of item") ||
+    lowerQuestion.includes("what kind")
+  ) {
     return "category";
   }
-  if (lowerQuestion.includes("condition") || lowerQuestion.includes("state") || lowerQuestion.includes("how clean")) {
+  if (
+    lowerQuestion.includes("condition") ||
+    lowerQuestion.includes("state") ||
+    lowerQuestion.includes("how clean")
+  ) {
     return "condition";
   }
-  
+
   // Default: return empty if can't determine
   return "information";
 };
@@ -80,11 +96,78 @@ export default function Home() {
     Ingredient[]
   >([]);
   const [pageLoaded, setPageLoaded] = useState(false);
+  const [placeholderText, setPlaceholderText] = useState("");
 
   // Fade-in animation on page load
   useEffect(() => {
     setPageLoaded(true);
   }, []);
+
+  // Typing animation for initial input placeholder
+  useEffect(() => {
+    if (isChatMode || animationPhase >= 1) {
+      setPlaceholderText(""); // Clear when transitioning
+      return;
+    }
+
+    const placeholderOptions = [
+      "I have 5 plastic water bottles...",
+      "Turn my old glass jars into a lamp...",
+      "Make something from cardboard boxes...",
+      "Create decor from wine bottles...",
+    ];
+
+    let currentIndex = 0;
+    let currentText = "";
+    let charIndex = 0;
+    let isDeleting = false;
+    let timeoutId: NodeJS.Timeout;
+
+    const typeSpeed = 80; // ms per character when typing
+    const deleteSpeed = 40; // ms per character when deleting
+    const pauseAfterTyping = 2000; // ms to wait after fully typed
+    const pauseAfterDeleting = 500; // ms to wait after fully deleted
+
+    const animate = () => {
+      const currentPhrase = placeholderOptions[currentIndex];
+
+      if (!isDeleting) {
+        // Typing forward
+        if (charIndex < currentPhrase.length) {
+          currentText = currentPhrase.substring(0, charIndex + 1);
+          setPlaceholderText(currentText);
+          charIndex++;
+          timeoutId = setTimeout(animate, typeSpeed);
+        } else {
+          // Finished typing, wait then start deleting
+          timeoutId = setTimeout(() => {
+            isDeleting = true;
+            animate();
+          }, pauseAfterTyping);
+        }
+      } else {
+        // Deleting
+        if (charIndex > 0) {
+          charIndex--;
+          currentText = currentPhrase.substring(0, charIndex);
+          setPlaceholderText(currentText);
+          timeoutId = setTimeout(animate, deleteSpeed);
+        } else {
+          // Finished deleting, move to next phrase
+          isDeleting = false;
+          currentIndex = (currentIndex + 1) % placeholderOptions.length;
+          timeoutId = setTimeout(animate, pauseAfterDeleting);
+        }
+      }
+    };
+
+    // Start the typing animation after a short delay
+    timeoutId = setTimeout(animate, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isChatMode, animationPhase]);
 
   const {
     state: workflowState,
@@ -272,7 +355,11 @@ export default function Home() {
         );
       }
     }
-  }, [workflowState.phase, workflowState.ingredients.length, workflowState.question]); // Also watch for question changes
+  }, [
+    workflowState.phase,
+    workflowState.ingredients.length,
+    workflowState.question,
+  ]); // Also watch for question changes
 
   useEffect(() => {
     if (workflowState.needsInput && workflowState.question) {
@@ -355,29 +442,34 @@ export default function Home() {
     }
 
     const threadId = workflowState.threadId;
-    
+
     // Check if 3D generation was already triggered for this thread
     const trellisKey = `trellis_queued_${threadId}`;
     const alreadyQueued = localStorage.getItem(trellisKey);
-    
+
     if (threadId && selectedConcept.image_url && !alreadyQueued) {
       console.log("[Trellis] Queueing 3D generation in background...");
-      
+
       // Mark as queued immediately to prevent duplicates
       localStorage.setItem(trellisKey, "true");
-      
+
       // Convert proxy URL to data URL for Trellis
       fetch(selectedConcept.image_url)
-        .then(res => res.blob())
-        .then(blob => new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        }))
-        .then(dataUrl => {
+        .then((res) => res.blob())
+        .then(
+          (blob) =>
+            new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            })
+        )
+        .then((dataUrl) => {
           // Trigger async Trellis generation (fire-and-forget)
           return fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/trellis/generate-async/${threadId}`,
+            `${
+              process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+            }/trellis/generate-async/${threadId}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -400,8 +492,10 @@ export default function Home() {
             }
           );
         })
-        .then(() => console.log("[Trellis] ✓ 3D generation queued successfully"))
-        .catch(err => {
+        .then(() =>
+          console.log("[Trellis] ✓ 3D generation queued successfully")
+        )
+        .catch((err) => {
           console.error("[Trellis] Failed to queue 3D generation:", err);
           // Remove flag on error so it can be retried
           localStorage.removeItem(trellisKey);
@@ -514,15 +608,11 @@ export default function Home() {
             opacity: pageLoaded ? 1 : 0,
           }}
         >
-          {/* Messages Area - This is the grown textarea transformed */}
+          {/* Messages Area - Fixed height, no resizing */}
           <div
             className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto"
             style={{
-              height:
-                animationPhase >= 7
-                  ? "calc(100vh - 280px)"
-                  : "calc(100vh - 200px)",
-              transition: "height 300ms ease-out",
+              height: "calc(100vh - 280px)",
             }}
           >
             <div className="space-y-4">
@@ -607,16 +697,20 @@ export default function Home() {
                         </div>
 
                         {/* Missing Information - Show when there are questions */}
-                        {message.clarifyingQuestions && message.clarifyingQuestions.length > 0 && message.ingredients && (
-                          <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 p-4 mt-2">
-                            <h3 className="text-yellow-400 text-lg font-semibold mb-2 font-mono">
-                              ⚠️ Missing Information
-                            </h3>
-                            <p className="text-yellow-200 text-sm font-mono">
-                              {getFieldFromQuestion(message.clarifyingQuestions[0])}
-                            </p>
-                          </div>
-                        )}
+                        {message.clarifyingQuestions &&
+                          message.clarifyingQuestions.length > 0 &&
+                          message.ingredients && (
+                            <div className="bg-yellow-900/20 border-[0.5px] border-yellow-700/50 p-4 mt-2">
+                              <h3 className="text-yellow-400 text-lg font-semibold mb-2 font-mono">
+                                ⚠️ Missing Information
+                              </h3>
+                              <p className="text-yellow-200 text-sm font-mono">
+                                {getFieldFromQuestion(
+                                  message.clarifyingQuestions[0]
+                                )}
+                              </p>
+                            </div>
+                          )}
                       </div>
                     )}
 
@@ -752,7 +846,9 @@ export default function Home() {
                                 )}
                                 {concept.style && (
                                   <div className="mt-2 flex items-center gap-1">
-                                    <span className="text-[#4ade80] text-xs font-mono">🎨</span>
+                                    <span className="text-[#4ade80] text-xs font-mono">
+                                      🎨
+                                    </span>
                                     <span className="text-[#4ade80] text-xs font-mono capitalize">
                                       {concept.style}
                                     </span>
@@ -799,12 +895,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Chat Input */}
+          {/* Chat Input - Fades in from below */}
           <div
-            className="mt-4 transition-all duration-500 ease-out"
+            className="mt-4 transition-all duration-700 ease-out"
             style={{
               transform:
-                animationPhase >= 7 ? "translateY(0)" : "translateY(200px)",
+                animationPhase >= 7 ? "translateY(0)" : "translateY(100px)",
               opacity: animationPhase >= 7 ? 1 : 0,
               pointerEvents: animationPhase >= 7 ? "auto" : "none",
             }}
@@ -831,9 +927,18 @@ export default function Home() {
                 {workflowState.isLoading ? (
                   <span className="flex items-center gap-2">
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="w-2 h-2 bg-black animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                      <div
+                        className="w-2 h-2 bg-black animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-black animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-black animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      ></div>
                     </div>
                     Processing
                   </span>
@@ -905,19 +1010,50 @@ export default function Home() {
         }}
       >
         {/* Title */}
-        <div className="overflow-hidden">
+        <div className="overflow-hidden text-center">
           <h1
-            className="text-3xl text-white mb-2 transition-all duration-500 ease-out font-mono"
+            className="text-5xl text-white mb-2 font-semibold transition-all duration-500 ease-out font-mono"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
               opacity: animationPhase >= 2 ? 0 : 1,
             }}
           >
-            Turn Waste into Products
+            What Do You Want To Make?
           </h1>
-          <h2 className="text-[#67B68B] text-base mt-2 mb-4 font-mono">
-            Describe your waste material
+          <pre className="text-[#67B68B] text-[8px] leading-[0.6] mb-2 font-mono opacity-60">
+            {`                 ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                               
+             ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
+          ↓↙↙↓↙↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
+        ↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙        ↓↙↙↓↙↙↓↙↓↙↓↙↙                       
+      ↙↓↙↓↙↓↙↓↙↓↙↓↙                  ↓↙↓↙↓↙↓↙↓↓                     
+     ↓↙↓↙↓↙↙↓↙↓↙                        ↙↓↙↓↙↙↙↓↓                   
+   ↙↓↙↓↙↓↙↓↙↓↙                            ↓↙↓↓↙↙↓↙                  
+  ↓↙↓↙↙↓↙↓↙↓↙                               ↙↓↙↓↙↓↙           ↙↓↙↙  
+ ↓↙↓↙↓↙↓↙↙↓                                  ↙↓↙↓↙↓↓     ↓↓↙↓↙↙     
+ ↙↓↙↓↙↓↙↓↓↙                                   ↙↓↙↓   ↙↓↙↓↙↙         
+↓↙↓↙↙↓↙↓↙↓                                      ↓↙↓↙↓↙↓             
+↓↙↓↙↓↙↓↙↓↙                                 ↙↓↙↓↙↙↓↙↓↓               
+↓↙↓↙↓↙↙↓↙↓↙                    ↙↙↓     ↓↓↙↓↙↓↙↓↙↓↙↓↙↙↓              
+↙↓↙↓↙↓↙↓↙↓↙↓↙↓        ↙↙↓↓↙↓↙↓↓↙    ↙↓↙↙↓↙↓↓↙  ↓↙↓↙↓↙↓              
+↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙↓↙↙↙   ↓↙↓↙↓↙↓↙↓      ↙↓↙↓↙↓↙              
+ ↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓     ↓↙↓↙↓↙↓↙↓↙       ↙↓↙↓↙↓↙↓              
+   ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙       ↙↓↙↙↓↙↙↓↙↓↙          ↓↙↓↙↓↙↓               
+                       ↓↙↓↙↓↙↓↙↓↙↓           ↙↓↙↙↓↙↓↙               
+                    ↙↓↙↓↙↓↙↓↙↓↓             ↓↙↓↙↓↙↓↙↓               
+                  ↓↙↓↙↓↙↓↙↓↙↓             ↓↙↙↓↙↓↙↓↙↓                
+                ↓↙↓↙↓↙↙↓↙↓↙             ↙↓↙↓↙↓↙↙↓↙↓                 
+              ↓↙↓↙↙↓↙↓↙↓↙↓            ↓↙↓↙↓↙↓↙↓↙↓↙                  
+             ↙↓↙↙↓↙↓↙↓↙↓↙↙↙      ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                   
+            ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                    
+           ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                     
+           ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙                       
+            ↓↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
+              ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
+                 ↓↓↙↓↙↓↙↓↙↓↙↙↓↙↓↙↓↙↓`}
+          </pre>
+          <h2 className="text-[#67B68B] mb-4 font-mono text-3xl">
+            Turn Waste into Products
           </h2>
         </div>
 
@@ -940,11 +1076,7 @@ export default function Home() {
                   handleGenerate();
                 }
               }}
-              placeholder={
-                animationPhase < 3
-                  ? "Describe what you want to make and what materials you have."
-                  : ""
-              }
+              placeholder={animationPhase < 3 ? placeholderText || "" : ""}
               style={{
                 height: animationPhase >= 4 ? "60vh" : "10rem",
                 transition: "height 800ms cubic-bezier(0.4, 0, 0.2, 1)",
