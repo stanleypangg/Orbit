@@ -562,9 +562,9 @@ function MagicPencilPageContent() {
                       disabled={!uploadedImage}
                       className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
                         tool === "pencil"
-                          ? "translate-y-0"
-                          : "translate-y-6 hover:translate-y-4"
-                      }`}
+                          ? "translate-y-8"
+                          : "translate-y-14 hover:translate-y-12"
+                      }`} 
                       title="Pencil"
                     >
                       <Image
@@ -580,8 +580,8 @@ function MagicPencilPageContent() {
                       disabled={!uploadedImage}
                       className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
                         tool === "eraser"
-                          ? "translate-y-0"
-                          : "translate-y-6 hover:translate-y-4"
+                          ? "translate-y-8"
+                          : "translate-y-18 hover:translate-y-15"
                       }`}
                       title="Eraser"
                     >
