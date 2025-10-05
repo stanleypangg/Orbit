@@ -96,8 +96,7 @@ export default function ProductDetail() {
     const storedImage = localStorage.getItem("productImage");
     if (storedImage) {
       setImageUrl(storedImage);
-      // Clean up after reading
-      localStorage.removeItem("productImage");
+      // Don't remove productImage yet - we'll use it as a key for model caching
     }
   }, []);
 
@@ -105,6 +104,19 @@ export default function ProductDetail() {
     const generate3DModel = async () => {
       if (!imageUrl) return;
 
+      // Create a simple hash of the image URL to use as a cache key
+      const imageHash = btoa(imageUrl.substring(0, 100)); // Use first 100 chars as hash
+      const cachedModelKey = `model_${imageHash}`;
+
+      // Check if we have a cached model for this image
+      const cachedModelUrl = localStorage.getItem(cachedModelKey);
+      if (cachedModelUrl) {
+        setModelUrl(cachedModelUrl);
+        return;
+      }
+
+      // Reset model URL to prevent showing old model
+      setModelUrl(undefined);
       setIsGenerating(true);
       setError(null);
 
@@ -124,28 +136,33 @@ export default function ProductDetail() {
           });
         }
 
-        const response = await fetch("http://localhost:8000/trellis/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            images: [processedImageUrl],
-            seed: 1337,
-            randomize_seed: false,
-            texture_size: 2048,
-            mesh_simplify: 0.96,
-            generate_color: true,
-            generate_normal: false,
-            generate_model: true,
-            save_gaussian_ply: false,
-            return_no_background: true,
-            ss_sampling_steps: 26,
-            ss_guidance_strength: 8.0,
-            slat_sampling_steps: 26,
-            slat_guidance_strength: 3.2,
-          }),
-        });
+        // Add timestamp to prevent caching issues
+        const timestamp = Date.now();
+        const response = await fetch(
+          `http://localhost:8000/trellis/generate?_t=${timestamp}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              images: [processedImageUrl],
+              seed: 1337,
+              randomize_seed: false,
+              texture_size: 2048,
+              mesh_simplify: 0.96,
+              generate_color: true,
+              generate_normal: false,
+              generate_model: true,
+              save_gaussian_ply: false,
+              return_no_background: true,
+              ss_sampling_steps: 26,
+              ss_guidance_strength: 8.0,
+              slat_sampling_steps: 26,
+              slat_guidance_strength: 3.2,
+            }),
+          }
+        );
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -154,7 +171,16 @@ export default function ProductDetail() {
 
         const data = await response.json();
         if (data.model_file) {
-          setModelUrl(data.model_file);
+          // Add cache-busting parameter to force reload
+          const modelUrlWithCacheBust = `${data.model_file}${
+            data.model_file.includes("?") ? "&" : "?"
+          }_cb=${Date.now()}`;
+          setModelUrl(modelUrlWithCacheBust);
+
+          // Cache the model URL for this image
+          const imageHash = btoa(imageUrl.substring(0, 100));
+          const cachedModelKey = `model_${imageHash}`;
+          localStorage.setItem(cachedModelKey, modelUrlWithCacheBust);
         }
       } catch (err) {
         console.error("Error generating 3D model:", err);

@@ -12,6 +12,11 @@ export default function Home() {
     "first"
   );
 
+  // Prefetch /poc page on mount for faster navigation
+  useEffect(() => {
+    router.prefetch("/poc");
+  }, [router]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -22,69 +27,44 @@ export default function Home() {
         setVideoPlayState("looping");
         // Jump to 2 seconds and play forward
         video.currentTime = 2;
-        video.playbackRate = 1;
         video.play();
       } else {
-        // In looping mode, alternate direction
-        if (video.playbackRate === 1) {
-          // Was playing forward, now reverse
-          video.playbackRate = -1;
-          video.currentTime = video.duration;
-          video.play();
-        } else {
-          // Was playing backward, now forward
-          video.playbackRate = 1;
-          video.currentTime = 2;
-          video.play();
-        }
-      }
-    };
-
-    const handleTimeUpdate = () => {
-      // When reversing, stop at 2 seconds
-      if (video.playbackRate === -1 && video.currentTime <= 2) {
-        video.pause();
-        handleVideoEnd();
+        // In looping mode, just loop from 2 seconds to end
+        video.currentTime = 2;
+        video.play();
       }
     };
 
     video.addEventListener("ended", handleVideoEnd);
-    video.addEventListener("timeupdate", handleTimeUpdate);
 
     return () => {
       video.removeEventListener("ended", handleVideoEnd);
-      video.removeEventListener("timeupdate", handleTimeUpdate);
     };
   }, [videoPlayState]);
 
   const handleClick = () => {
-    // Phase 1: Fade out landing.png and text (0-600ms)
+    // Phase 1: Fade out landing content (0-600ms)
     setAnimationPhase(1);
 
     setTimeout(() => {
-      // Phase 2: Render macbook off-screen (600ms)
+      // Phase 2: Show MacBook fitted to screen (600ms)
       setAnimationPhase(2);
     }, 600);
 
     setTimeout(() => {
-      // Phase 3: Start sliding macbook up (650-1850ms)
+      // Phase 3: Start zooming into MacBook (800-3300ms)
       setAnimationPhase(3);
-    }, 650);
+    }, 800);
 
     setTimeout(() => {
-      // Phase 4: Macbook pauses centered on screen (1850-2350ms)
+      // Phase 4: Fade out (3300-3800ms)
       setAnimationPhase(4);
-    }, 1850);
+    }, 3300);
 
     setTimeout(() => {
-      // Phase 5: Zoom into macbook screen (2350-4350ms)
-      setAnimationPhase(5);
-    }, 2350);
-
-    setTimeout(() => {
-      // Phase 6: Navigate to /poc (4350ms)
+      // Phase 5: Navigate to /poc (3800ms)
       router.push("/poc");
-    }, 4350);
+    }, 3800);
   };
 
   return (
@@ -115,7 +95,11 @@ export default function Home() {
       >
         {/* Isometric room video */}
         <div className="relative cursor-pointer" onClick={handleClick}>
-          <img className="w-[600px] h-[600px] object-cover absolute" src="/landing_mask.png" alt="" />
+          <img
+            className="w-[600px] h-[600px] object-cover absolute"
+            src="/landing_mask.png"
+            alt=""
+          />
           <video
             ref={videoRef}
             autoPlay
@@ -138,46 +122,41 @@ export default function Home() {
       {/* MacBook animation */}
       {animationPhase >= 2 && (
         <div
-          className="fixed inset-0 z-20 flex items-center justify-center"
+          className="fixed inset-0 z-20 flex items-center justify-center bg-[#0F1922]"
           style={{
-            transform:
-              animationPhase === 2
-                ? "translateY(100%)"
-                : animationPhase === 3 || animationPhase === 4
-                ? "translateY(0)"
-                : animationPhase >= 5
-                ? "translateY(0) scale(6)"
-                : "translateY(100%)",
-            transition:
-              animationPhase >= 3 && animationPhase < 5
-                ? "transform 1.2s cubic-bezier(0.4, 0, 0.2, 1)"
-                : animationPhase >= 5
-                ? "transform 2s cubic-bezier(0.65, 0, 0.35, 1)"
-                : "none",
+            opacity: animationPhase >= 4 ? 0 : 1,
+            transition: animationPhase >= 4 ? "opacity 500ms ease-out" : "none",
           }}
         >
-          <div className="relative w-screen">
+          <div
+            className="relative w-screen h-screen flex items-center justify-center"
+            style={{
+              transform: animationPhase >= 3 ? "scale(6)" : "scale(1)",
+              transition:
+                animationPhase >= 3
+                  ? "transform 2.5s cubic-bezier(0.65, 0, 0.35, 1)"
+                  : "none",
+            }}
+          >
             <Image
-              src="/macbook.png"
+              src="/greenbook.png"
               alt="MacBook"
               width={1920}
               height={1200}
-              className="w-full h-auto"
+              className="max-w-full max-h-full w-auto h-auto object-contain"
               priority
             />
 
             {/* Loading spinner in the laptop screen */}
-            {animationPhase >= 4 && (
-              <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2">
-                <div
-                  className="w-16 h-16 border-4 border-[#4ade80] border-t-transparent rounded-full animate-spin"
-                  style={{
-                    opacity: animationPhase >= 5 ? 1 : 0,
-                    transition: "opacity 500ms ease-in",
-                  }}
-                />
-              </div>
-            )}
+            <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2">
+              <div
+                className="w-16 h-16 border-4 border-[#4ade80] border-t-transparent rounded-full animate-spin"
+                style={{
+                  opacity: animationPhase >= 3 ? 1 : 0,
+                  transition: "opacity 300ms ease-in",
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

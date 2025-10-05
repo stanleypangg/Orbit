@@ -16,13 +16,16 @@ interface HistoryState {
 
 export default function MagicPencilPage() {
   const searchParams = useSearchParams();
-  
+
   // Get hero image from workflow or fallback to demo image
-  const imageUrl = searchParams.get("imageUrl") || searchParams.get("image") || "/pikachu.webp";
+  const imageUrl =
+    searchParams.get("imageUrl") ||
+    searchParams.get("image") ||
+    "/pikachu.webp";
   const projectTitle = searchParams.get("title") || "Your Project";
   const threadId = searchParams.get("threadId");
   const conceptId = searchParams.get("conceptId");
-  
+
   const [uploadedImage, setUploadedImage] = useState<string | null>(imageUrl);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<"pencil" | "eraser" | null>(null);
@@ -75,9 +78,9 @@ export default function MagicPencilPage() {
         setHistory([{ imageData, baseImage: uploadedImage }]);
         setHistoryIndex(0);
       };
-      
+
       img.onerror = () => {
-        console.error('Failed to load image:', uploadedImage);
+        console.error("Failed to load image:", uploadedImage);
       };
     }
   }, [uploadedImage]);
@@ -331,6 +334,11 @@ export default function MagicPencilPage() {
 
         setIsGenerating(false);
         setPrompt("");
+
+        // After generation completes, navigate to product page with the final edited image
+        const canvasDataUrl = canvas.toDataURL("image/png");
+        localStorage.setItem("productImage", canvasDataUrl);
+        window.location.href = "/product";
       };
 
       img.onerror = () => {
@@ -346,47 +354,24 @@ export default function MagicPencilPage() {
   };
 
   return (
-    <div className="h-screen bg-[#161924] flex flex-col font-menlo overflow-hidden">
-      {/* Header */}
-      <header className="w-full bg-[#161924] pt-6 pb-4 px-10 border-b border-[#2A3142] flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Image
-            src="/logo_text.svg"
-            alt="Orbit"
-            width={80}
-            height={27}
-            className="opacity-90"
-          />
-          {projectTitle && threadId && (
-            <div className="flex items-center gap-2 text-gray-400 text-sm">
-              <span className="text-[#4ade80]">✓</span>
-              <span>{projectTitle}</span>
-            </div>
-          )}
-        </div>
-        <a 
-          href="/poc" 
-          className="text-gray-400 hover:text-white text-sm transition-colors"
-        >
-          ← Back to Workflow
-        </a>
-      </header>
-      
+    <div className="h-screen pt-12 bg-[#161924] flex flex-col font-menlo overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col pt-8 max-w-7xl mx-auto w-full">
+      <div className="flex-1 flex flex-col pt-4 max-w-7xl mx-auto w-full px-8">
         <div className="w-full max-w-full">
           {/* Title */}
-          <h1 className="text-4xl font-light tracking-wider text-white mb-2">
-            {projectTitle && threadId ? `Edit ${projectTitle}` : 'Adjust your Design'}
+          <h1 className="text-3xl font-light tracking-wider text-white mb-1">
+            {projectTitle && threadId
+              ? `Edit ${projectTitle}`
+              : "Adjust your Design"}
           </h1>
-          <p className="text-[#67B68B] text-xl tracking-wider mb-12">
+          <p className="text-[#67B68B] text-lg tracking-wider mb-6">
             Make changes before finalizing
           </p>
 
           {/* Main Canvas Area */}
           <div className="border-[#67B68B] border-[0.45px] bg-[#2A3038]">
             {/* Tooltip Block - Full Width at Top */}
-            <div className="flex items-center gap-4 px-8 py-4 text-[#67B68B] text-sm border-b border-[#67B68B]/20">
+            <div className="flex items-center gap-4 px-6 py-3 text-[#67B68B] text-sm border-b border-[#67B68B]/20">
               <Image
                 src="/edit/tooltip.svg"
                 alt="Info"
@@ -399,9 +384,9 @@ export default function MagicPencilPage() {
               </span>
             </div>
 
-            <div className="relative p-8">
+            <div className="relative p-6">
               {/* Tools Component - Compact Top Left */}
-              <div className="absolute top-8 left-8 z-10 w-48 border-[0.5px] border-[#67B68B] bg-[#2A3038] p-4">
+              <div className="absolute top-6 left-6 z-10 w-48 min-h-[260px] border-[0.5px] border-[#67B68B] bg-[#2A3038] p-4">
                 <h3 className="text-md text-[#67B68B] font-normal mb-4">
                   Tools
                 </h3>
@@ -451,7 +436,7 @@ export default function MagicPencilPage() {
                 </div>
 
                 {/* Tool Icons - Animated Peek */}
-                <div className="relative h-20 overflow-hidden -mb-4">
+                <div className="relative h-28 overflow-hidden -mb-4">
                   <div className="flex">
                     <button
                       onClick={() => setTool("pencil")}
@@ -459,7 +444,7 @@ export default function MagicPencilPage() {
                       className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
                         tool === "pencil"
                           ? "translate-y-0"
-                          : "translate-y-10 hover:translate-y-8"
+                          : "translate-y-6 hover:translate-y-4"
                       }`}
                       title="Pencil"
                     >
@@ -477,7 +462,7 @@ export default function MagicPencilPage() {
                       className={`flex-1 h-24 flex items-center justify-center transition-all duration-300 ease-out disabled:opacity-30 ${
                         tool === "eraser"
                           ? "translate-y-0"
-                          : "translate-y-10 hover:translate-y-8"
+                          : "translate-y-6 hover:translate-y-4"
                       }`}
                       title="Eraser"
                     >
@@ -496,8 +481,8 @@ export default function MagicPencilPage() {
               {/* Canvas Container */}
               <div
                 ref={containerRef}
-                className="relative bg-[#2A3038] flex items-center justify-center"
-                style={{ minHeight: "300px", height: "350px" }}
+                className="relative bg-[#2A3038] flex items-start justify-center pt-6"
+                style={{ minHeight: "280px", height: "300px" }}
               >
                 {uploadedImage && (
                   <>
@@ -508,11 +493,12 @@ export default function MagicPencilPage() {
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                       onMouseMove={handleMouseMove}
-                      className={`max-w-full max-h-full ${
+                      className={`w-auto ${
                         tool ? "cursor-none" : "cursor-default"
                       }`}
                       style={{
                         imageRendering: "crisp-edges",
+                        height: "260px",
                       }}
                     />
                     {/* Custom Cursor */}
@@ -558,37 +544,39 @@ export default function MagicPencilPage() {
 
               {/* Prompt Input */}
               {uploadedImage && (
-                <div className="mt-6 border-[0.5px] border-[#67B68B] bg-[#2A3344] p-6">
-                  <label className="block text-[#67B68B] text-sm mb-4 tracking-wide font-normal">
+                <div className="mt-4 border-[0.5px] border-[#67B68B] bg-[#2A3344] p-4">
+                  <label className="block text-[#67B68B] text-sm mb-3 tracking-wide font-normal">
                     Describe your Change
                   </label>
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Type what you want to change..."
-                    className="w-full bg-[#3A4354] text-white text-sm border-none p-4 h-20 resize-none focus:outline-none placeholder:text-gray-500 placeholder:text-sm"
+                    className="w-full bg-[#3A4354] text-white text-sm border-none p-3 h-16 resize-none focus:outline-none placeholder:text-gray-500 placeholder:text-sm"
                   />
                 </div>
               )}
 
               {/* Action Buttons */}
-              <div className="mt-6 flex items-center justify-end gap-8">
+              <div className="mt-4 flex items-center justify-end gap-8">
                 <button
                   onClick={() => {
-                    // Store image in localStorage to pass to product page
-                    if (uploadedImage) {
-                      localStorage.setItem("productImage", uploadedImage);
+                    // Get the current canvas content (with user edits)
+                    const canvas = canvasRef.current;
+                    if (canvas) {
+                      const canvasDataUrl = canvas.toDataURL("image/png");
+                      localStorage.setItem("productImage", canvasDataUrl);
+                      window.location.href = "/product";
                     }
-                    window.location.href = "/product";
                   }}
                   className="text-[#67B68B] hover:text-[#3bc970] font-medium transition-colors uppercase underline underline-offset-2 text-sm tracking-wide cursor-pointer"
                 >
-                  Skip
+                  Continue
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating || !prompt.trim()}
-                  className="px-24 py-4 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
+                  className="w-64 py-3 bg-[#67B68B] hover:bg-[#3bc970] disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-semibold transition-colors uppercase tracking-wide"
                 >
                   {isGenerating ? "Generating..." : "Generate"}
                 </button>
