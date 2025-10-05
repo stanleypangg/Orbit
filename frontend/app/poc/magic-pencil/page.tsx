@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { getProxiedImageUrl } from "@/lib/utils/imageProxy";
+
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
 
 interface Point {
   x: number;
@@ -15,7 +18,7 @@ interface HistoryState {
   baseImage: string; // The base image URL for this state
 }
 
-export default function MagicPencilPage() {
+function MagicPencilPageContent() {
   const searchParams = useSearchParams();
 
   // Get hero image from workflow or fallback to demo image
@@ -310,17 +313,22 @@ export default function MagicPencilPage() {
       const drawnOverlayUrl = canvas.toDataURL("image/png");
 
       // Call the backend API
-      const response = await fetch("http://localhost:8000/magic-pencil/edit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          original_image_url: originalImageUrl,
-          drawn_overlay_url: drawnOverlayUrl,
-          prompt: prompt.trim(),
-        }),
-      });
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        }/magic-pencil/edit`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            original_image_url: originalImageUrl,
+            drawn_overlay_url: drawnOverlayUrl,
+            prompt: prompt.trim(),
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -602,5 +610,19 @@ export default function MagicPencilPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MagicPencilPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen bg-[#161924] flex items-center justify-center">
+          <div className="text-[#67B68B]">Loading...</div>
+        </div>
+      }
+    >
+      <MagicPencilPageContent />
+    </Suspense>
   );
 }
