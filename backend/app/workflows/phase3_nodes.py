@@ -268,8 +268,9 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             "current_node": "IMG"
         }
 
-    async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept") -> ConceptVariant:
-        """Generate a single high-quality hero image with rate limiting using Gemini."""
+    async def generate_single_image(variant: ConceptVariant, semaphore: asyncio.Semaphore, title: str = "Concept", index: int = 0) -> ConceptVariant:
+        """Generate a single high-quality hero image with rate limiting using Gemini.
+        Updates Redis progress as each image completes for real-time streaming."""
         async with semaphore:
             try:
                 from google import genai as google_genai
@@ -330,6 +331,25 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                 else:
                     logger.warning(f"IMG: ✗ No image in Gemini response, will use placeholder for {title}")
                 
+                # OPTIMIZATION: Update Redis with this single concept's image immediately
+                # This allows streaming to frontend as each image completes
+                image_url = f"{API_BASE_URL}/images/{variant.image_id}" if variant.image_id else f"{API_BASE_URL}/images/placeholder/{variant.style}"
+                
+                concept_update = {
+                    "concept_id": f"concept_{index}",
+                    "title": title,
+                    "description": variant.description,
+                    "style": variant.style,
+                    "image_url": image_url,
+                    "status": "ready",  # Mark as complete
+                    "url": image_url
+                }
+                
+                # Update Redis with completed concept
+                concept_progress_key = f"concept_progress:{state.thread_id}:{index}"
+                redis_service.set(concept_progress_key, json.dumps(concept_update), ex=3600)
+                logger.info(f"IMG: ✓ Concept {index+1} ready for streaming with image")
+                
                 return variant
 
             except Exception as e:
@@ -366,7 +386,7 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
             title = state.viable_options[idx].get("title", "Concept") if idx < len(state.viable_options) else "Concept"
             logger.info(f"IMG: Generating HERO image {idx+1}/{len(state.concept_variants)} ({variant.style}): {title}")
             logger.info(f"IMG: Using detailed prompt: {variant.image_prompt[:150]}...")
-            generated = await generate_single_image(variant, semaphore, title)
+            generated = await generate_single_image(variant, semaphore, title, idx)  # Pass index for progress tracking
             generated_variants.append(generated)
 
         # Filter successful generations
@@ -384,6 +404,8 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
         # Build concept payload - map each image to its corresponding idea
         concept_payload = []
         timestamp = time.time()
+        logger.info(f"IMG: All {len(state.concept_variants)} hero images generated, building final payload")
+        
         for idx, variant in enumerate(state.concept_variants):
             # Generate proper URL for our images endpoint
             image_url = f"{API_BASE_URL}/images/{variant.image_id}" if variant.image_id else f"{API_BASE_URL}/images/placeholder/{variant.style}"
