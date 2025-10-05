@@ -821,11 +821,27 @@ async def health_check() -> Dict[str, str]:
 async def run_workflow_background(thread_id: str, user_input: str):
     """Run workflow in background task."""
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting workflow background task for {thread_id}")
+        
         result = await workflow_orchestrator.start_workflow(thread_id, user_input)
+        
+        logger.info(f"Workflow result: {result}")
 
         # Store workflow state updates
         state_key = f"workflow_state:{thread_id}"
         redis_service.set(state_key, json.dumps(result), ex=3600)
+        
+        # Store ingredients if present
+        if result.get("result") and result["result"].get("ingredients_data"):
+            ingredients_key = f"ingredients:{thread_id}"
+            ingredients_data = {
+                "ingredients": result["result"]["ingredients_data"].get("ingredients", []),
+                "categories": result["result"]["ingredients_data"].get("categories", {})
+            }
+            redis_service.set(ingredients_key, json.dumps(ingredients_data), ex=3600)
+            logger.info(f"Stored ingredients for {thread_id}")
 
         # Store final result if complete
         if result.get("status") == "phase_complete":
@@ -833,6 +849,11 @@ async def run_workflow_background(thread_id: str, user_input: str):
             redis_service.set(completion_key, json.dumps(result), ex=3600)
 
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Workflow error for {thread_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         # Store error
         error_key = f"workflow_error:{thread_id}"
         redis_service.set(error_key, json.dumps({"error": str(e)}), ex=3600)
