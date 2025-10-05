@@ -453,35 +453,40 @@ export default function ProductDetail() {
                     </defs>
                   </svg>
                   
-                  {/* Labels */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6">
+                  {/* Labels - positioned to match triangle vertices */}
+                  {/* Top - CARBON */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-8">
                     <div className="text-xs text-[#67B68B] font-mono text-center">
                       {carbonScore !== undefined ? (
                         <div className="font-bold">{carbonScore}</div>
                       ) : (
                         <div className="h-4 w-8 bg-[#67B68B]/20 animate-pulse mx-auto"></div>
                       )}
-                      <div className="text-[10px] text-gray-400">CARBON</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">CARBON</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 right-0 translate-x-4 translate-y-6">
+                  
+                  {/* Bottom Right - WATER */}
+                  <div className="absolute bottom-0 left-[84%] -translate-x-1/2 translate-y-8">
                     <div className="text-xs text-[#5BA3D0] font-mono text-center">
                       {waterScore !== undefined ? (
                         <div className="font-bold">{waterScore}</div>
                       ) : (
                         <div className="h-4 w-8 bg-[#5BA3D0]/20 animate-pulse mx-auto"></div>
                       )}
-                      <div className="text-[10px] text-gray-400">WATER</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">WATER</div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 -translate-x-4 translate-y-6">
+                  
+                  {/* Bottom Left - CIRCULAR */}
+                  <div className="absolute bottom-0 left-[16%] -translate-x-1/2 translate-y-8">
                     <div className="text-xs text-[#4ade80] font-mono text-center">
                       {circularScore !== undefined ? (
                         <div className="font-bold">{circularScore}</div>
                       ) : (
                         <div className="h-4 w-8 bg-[#4ade80]/20 animate-pulse mx-auto"></div>
                       )}
-                      <div className="text-[10px] text-gray-400">CIRCULAR</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">CIRCULAR</div>
                     </div>
                   </div>
                 </div>
