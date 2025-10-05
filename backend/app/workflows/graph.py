@@ -9,10 +9,7 @@ from langgraph.graph import StateGraph, START, END
 from app.workflows.state import WorkflowState
 from app.workflows.nodes import (
     ingredient_extraction_node,
-    null_checker_node,
     ingredient_categorizer_node,
-    process_user_clarification,
-    should_ask_questions,
     should_continue_discovery
 )
 from app.workflows.phase2_nodes import (
@@ -61,11 +58,9 @@ class RecycleWorkflowOrchestrator:
         # Create workflow graph
         workflow = StateGraph(WorkflowState)
 
-        # Phase 1: Progressive Ingredient Discovery Nodes
+        # Phase 1: Ingredient Discovery Nodes (simplified - no user questions)
         workflow.add_node("P1a_extract", ingredient_extraction_node)
-        workflow.add_node("P1b_null_check", null_checker_node)
         workflow.add_node("P1c_categorize", ingredient_categorizer_node)
-        workflow.add_node("process_clarification", process_user_clarification)
 
         # Phase 2: Goal Formation & Choice Generation (simplified - no evaluation)
         workflow.add_node("G1_goal_formation", goal_formation_node)
@@ -84,29 +79,15 @@ class RecycleWorkflowOrchestrator:
         # Entry point - always start with ingredient extraction
         workflow.add_edge(START, "P1a_extract")
 
-        # Phase 1 Flow: Progressive Ingredient Discovery
-        workflow.add_edge("P1a_extract", "P1b_null_check")
+        # Phase 1 Flow: Direct extraction to categorization (no user questions)
+        workflow.add_edge("P1a_extract", "P1c_categorize")
 
-        # Conditional routing from P1b
-        workflow.add_conditional_edges(
-            "P1b_null_check",
-            should_ask_questions,
-            {
-                "ask_user": "process_clarification",  # Interrupt for user input
-                "categorize": "P1c_categorize"
-            }
-        )
-
-        # After user clarification, go back to null checking
-        workflow.add_edge("process_clarification", "P1b_null_check")
-
-        # Conditional routing from P1c
+        # Conditional routing from P1c - go straight to goal formation
         workflow.add_conditional_edges(
             "P1c_categorize",
             should_continue_discovery,
             {
                 "goal_formation": "G1_goal_formation",
-                "null_check": "P1b_null_check",
                 "categorize": "P1c_categorize"
             }
         )
@@ -147,8 +128,7 @@ class RecycleWorkflowOrchestrator:
             "on",
         }
         compile_kwargs: Dict[str, Any] = {}
-        if enable_interrupts:
-            compile_kwargs["interrupt_before"] = ["process_clarification"]
+        # No interrupts needed - removed clarification flow
 
         if enable_checkpointing:
             try:
@@ -236,135 +216,7 @@ class RecycleWorkflowOrchestrator:
                 "error": str(e)
             }
 
-    async def continue_workflow(self, thread_id: str, user_response: str) -> Dict[str, Any]:
-        """
-        Continue a paused workflow with user's response to clarification questions.
-
-        Args:
-            thread_id: Unique identifier for the workflow session
-            user_response: User's answer to the clarification questions
-
-        Returns:
-            Dict containing updated workflow state
-        """
-        logger.info(f"Continuing workflow for thread {thread_id}")
-
-        try:
-            config = {
-                "configurable": {"thread_id": thread_id},
-                "recursion_limit": 50  # Increase from default 25
-            }
-
-            # Check if checkpointing is enabled
-            if self.compiled_graph.checkpointer:
-                # Get current state from checkpointer
-                current_state = self.compiled_graph.get_state(config)
-
-                if not current_state:
-                    return {
-                        "status": "error",
-                        "error": "Workflow state not found. Please start a new workflow."
-                    }
-
-                # Update state with user response
-                updated_values = current_state.values.copy()
-                updated_values["user_input"] = user_response  # Add user response to state
-
-                # Continue from where we left off
-                result = await self.compiled_graph.ainvoke(
-                    updated_values,
-                    config=config
-                )
-            else:
-                # Without checkpointing, we need to restart with clarification
-                # Get the previous state from Redis
-                from app.core.redis import redis_service
-                from app.workflows.nodes import load_ingredients_from_redis
-                import json
-                
-                state_key = f"workflow_state:{thread_id}"
-                state_data = redis_service.get(state_key)
-                
-                if not state_data:
-                    return {
-                        "status": "error",
-                        "error": "Workflow state not found. Checkpointing is disabled. Please start a new workflow."
-                    }
-                
-                previous_state = json.loads(state_data)
-                
-                # Create a new state with the clarification
-                from app.workflows.state import WorkflowState
-                
-                # Get the result from previous state
-                prev_result = previous_state.get("result", {})
-                
-                # CRITICAL: Load ingredients from their separate Redis key!
-                # Don't rely on workflow_state having them - they're stored separately
-                ingredients_data = load_ingredients_from_redis(thread_id)
-                logger.info(f"Loaded {len(ingredients_data.ingredients) if ingredients_data else 0} ingredients from Redis")
-                
-                # Create state for clarification processing
-                clarification_state = WorkflowState(
-                    thread_id=thread_id,
-                    user_input=user_response,
-                    initial_user_input=prev_result.get("initial_user_input", ""),
-                    current_phase=prev_result.get("current_phase", "ingredient_discovery"),
-                    current_node="P1b_null_check",  # Will continue from null check
-                    start_time=prev_result.get("start_time", __import__('time').time()),
-                    clarification_loop_count=prev_result.get("clarification_loop_count", 0) + 1,
-                    ingredients_data=ingredients_data if ingredients_data and ingredients_data.ingredients else None,
-                    user_questions=prev_result.get("user_questions", []),
-                    user_constraints=prev_result.get("user_constraints", {})
-                )
-                
-                logger.info(f"Processing clarification with user response: {user_response[:50]}...")
-                logger.info(f"State has {len(clarification_state.ingredients_data.ingredients) if clarification_state.ingredients_data else 0} ingredients")
-                
-                # CRITICAL FIX: Manually process clarification BEFORE continuing workflow
-                # Without checkpointer, we can't resume from specific nodes, so we process clarification here
-                from app.workflows.nodes import process_user_clarification
-                clarification_result = await process_user_clarification(clarification_state)
-                
-                # Update state with processed clarification
-                if clarification_result.get("ingredients_data"):
-                    clarification_state.ingredients_data = clarification_result["ingredients_data"]
-                clarification_state.user_questions = []  # Clear questions after processing
-                
-                logger.info("✅ Clarification processed, continuing workflow from P1a")
-                
-                # Run workflow from beginning - it will skip P1a (ingredients exist) and go to P1b
-                result = await self.compiled_graph.ainvoke(
-                    clarification_state.model_dump(),
-                    config=config
-                )
-
-            # Check if still waiting for input or completed
-            if result.get("needs_user_input", False):
-                return {
-                    "status": "waiting_for_input",
-                    "thread_id": thread_id,
-                    "questions": result.get("user_questions", []),
-                    "current_node": result.get("current_node", "unknown")
-                }
-
-            return {
-                "status": "phase_complete",
-                "thread_id": thread_id,
-                "current_phase": result.get("current_phase", "unknown"),
-                "current_node": result.get("current_node", "unknown"),
-                "result": result
-            }
-
-        except Exception as e:
-            logger.error(f"Workflow continuation failed: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {
-                "status": "error",
-                "thread_id": thread_id,
-                "error": str(e)
-            }
+    # continue_workflow removed - no longer needed without clarification flow
 
     async def get_workflow_status(self, thread_id: str) -> Dict[str, Any]:
         """Get current status of a workflow."""
