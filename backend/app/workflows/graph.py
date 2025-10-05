@@ -286,7 +286,10 @@ class RecycleWorkflowOrchestrator:
 
         try:
             # Run the workflow with interrupts enabled
-            config = {"configurable": {"thread_id": thread_id}}
+            config = {
+                "configurable": {"thread_id": thread_id},
+                "recursion_limit": 50  # Increase from default 25
+            }
 
             # Invoke the graph with the initial state
             result = await self.compiled_graph.ainvoke(
@@ -336,7 +339,10 @@ class RecycleWorkflowOrchestrator:
         logger.info(f"Continuing workflow for thread {thread_id}")
 
         try:
-            config = {"configurable": {"thread_id": thread_id}}
+            config = {
+                "configurable": {"thread_id": thread_id},
+                "recursion_limit": 50  # Increase from default 25
+            }
 
             # Check if checkpointing is enabled
             if self.compiled_graph.checkpointer:
@@ -362,6 +368,7 @@ class RecycleWorkflowOrchestrator:
                 # Without checkpointing, we need to restart with clarification
                 # Get the previous state from Redis
                 from app.core.redis import redis_service
+                from app.workflows.nodes import load_ingredients_from_redis
                 import json
                 
                 state_key = f"workflow_state:{thread_id}"
@@ -381,18 +388,29 @@ class RecycleWorkflowOrchestrator:
                 # Get the result from previous state
                 prev_result = previous_state.get("result", {})
                 
+                # CRITICAL: Load ingredients from their separate Redis key!
+                # Don't rely on workflow_state having them - they're stored separately
+                ingredients_data = load_ingredients_from_redis(thread_id)
+                logger.info(f"Loaded {len(ingredients_data.ingredients) if ingredients_data else 0} ingredients from Redis")
+                
                 # Create new state with user response appended
+                # IMPORTANT: Start from process_clarification node, NOT P1a!
                 continue_state = WorkflowState(
                     thread_id=thread_id,
                     user_input=user_response,
                     initial_user_input=prev_result.get("initial_user_input", ""),
                     current_phase=prev_result.get("current_phase", "ingredient_discovery"),
-                    current_node=prev_result.get("current_node", "P1a"),
+                    current_node="process_clarification",  # Start from clarification processing
                     start_time=prev_result.get("start_time", __import__('time').time()),
                     clarification_loop_count=prev_result.get("clarification_loop_count", 0) + 1,
-                    # Copy over ingredients if they exist
-                    ingredients_data=prev_result.get("ingredients_data")
+                    # FIXED: Load from separate Redis key, not from prev_result
+                    ingredients_data=ingredients_data if ingredients_data and ingredients_data.ingredients else None,
+                    user_questions=prev_result.get("user_questions", []),
+                    user_constraints=prev_result.get("user_constraints", {})
                 )
+                
+                logger.info(f"Continuing from process_clarification node with user response: {user_response[:50]}...")
+                logger.info(f"State has {len(continue_state.ingredients_data.ingredients) if continue_state.ingredients_data else 0} ingredients")
                 
                 # Run workflow from current point
                 result = await self.compiled_graph.ainvoke(

@@ -145,8 +145,8 @@ export function useWorkflow({
                 confidence: ing.confidence || 0.8,
               })),
               phase: 'ingredient_discovery',
-              isLoading: false,
-              loadingMessage: null,
+              // DON'T clear loading state here - keep it active until we reach a stopping point
+              // (user_question, choices_generated, etc.)
             }));
             break;
 

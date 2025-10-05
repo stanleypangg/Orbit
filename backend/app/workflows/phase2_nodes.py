@@ -204,12 +204,11 @@ async def goal_formation_node(state: WorkflowState) -> Dict[str, Any]:
     # Validate that we have ingredient data
     if not state.ingredients_data or not state.ingredients_data.ingredients:
         logger.error("G1: No ingredient data available for goal formation")
-        message = "Goal formation requires complete ingredient data"
+        message = "No ingredient data available for goal formation"
         state.errors.append(message)
-        return {
-            "errors": state.errors,
-            "current_node": "G1"
-        }
+        
+        # STOP THE LOOP: This is a fatal error, we cannot proceed
+        raise Exception("Fatal: No ingredients available - extraction may have failed")
 
     # Build goal formation prompt
     ingredients_summary = []
@@ -675,8 +674,19 @@ async def evaluation_node(state: WorkflowState) -> Dict[str, Any]:
 # Routing functions for LangGraph
 def should_proceed_to_choices(state: WorkflowState) -> str:
     """Determine if goal formation is complete."""
+    # Check for fatal errors that should stop the workflow
+    if state.errors and len(state.errors) > 3:
+        logger.error(f"Too many errors ({len(state.errors)}), cannot proceed")
+        raise Exception(f"Workflow failed: {state.errors[-1]}")
+    
     if state.goals and state.artifact_type:
         return "choice_generation"
+    
+    # If no goals but errors exist, try one more time max
+    if state.errors and "No ingredient data" in str(state.errors):
+        logger.error("Fatal error: No ingredients available, stopping workflow")
+        raise Exception("Cannot proceed without ingredient data")
+    
     return "goal_formation"
 
 
