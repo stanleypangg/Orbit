@@ -921,6 +921,26 @@ async def health_check() -> Dict[str, str]:
         }
 
 
+# Helper function to convert Pydantic models to dicts recursively
+def serialize_pydantic(obj):
+    """Recursively convert Pydantic models to dictionaries for JSON serialization."""
+    if hasattr(obj, "model_dump"):
+        # It's a Pydantic model, convert to dict
+        return obj.model_dump()
+    elif isinstance(obj, dict):
+        # Recursively process dictionary values
+        return {k: serialize_pydantic(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        # Recursively process list items
+        return [serialize_pydantic(item) for item in obj]
+    elif isinstance(obj, tuple):
+        # Convert tuples to lists (JSON doesn't have tuples)
+        return [serialize_pydantic(item) for item in obj]
+    else:
+        # Return as-is for primitives (str, int, float, bool, None)
+        return obj
+
+
 # Background task functions
 async def run_workflow_background(thread_id: str, user_input: str):
     """Run workflow in background task with progress tracking."""
@@ -958,10 +978,8 @@ async def run_workflow_background(thread_id: str, user_input: str):
         # Store final workflow state (serialize properly)
         result_data = result.get("result", {})
         
-        # Convert IngredientsData to dict if present
-        if result_data.get("ingredients_data"):
-            if hasattr(result_data["ingredients_data"], "model_dump"):
-                result_data["ingredients_data"] = result_data["ingredients_data"].model_dump()
+        # Convert all Pydantic models to dicts recursively
+        result_data = serialize_pydantic(result_data)
         
         final_state = {
             "status": result.get("status", "complete"),
@@ -987,7 +1005,9 @@ async def run_workflow_background(thread_id: str, user_input: str):
         # Store final result if complete
         if result.get("status") == "phase_complete":
             completion_key = f"workflow_complete:{thread_id}"
-            redis_service.set(completion_key, json.dumps(result), ex=3600)
+            # Serialize Pydantic models before storing
+            serialized_result = serialize_pydantic(result)
+            redis_service.set(completion_key, json.dumps(serialized_result), ex=3600)
 
     except Exception as e:
         import logging
@@ -1050,7 +1070,7 @@ async def generate_detailed_and_continue(thread_id: str, option_id: str, selecte
             result_h1 = await final_packaging_node(workflow_state)
             
             # Store complete workflow result
-            redis_service.set(state_key, json.dumps({
+            complete_result = {
                 "status": "complete",
                 "current_phase": "complete",
                 "current_node": "COMPLETE",
@@ -1058,14 +1078,17 @@ async def generate_detailed_and_continue(thread_id: str, option_id: str, selecte
                     "final_package": result_h1.get("final_package"),
                     "essential_package": result_h1.get("essential_package")
                 }
-            }), ex=3600)
+            }
+            # Serialize Pydantic models before storing
+            redis_service.set(state_key, json.dumps(serialize_pydantic(complete_result)), ex=3600)
             
             # Mark workflow as complete
             completion_key = f"workflow_complete:{thread_id}"
-            redis_service.set(completion_key, json.dumps({
+            completion_result = {
                 "status": "complete",
                 "final_package": result_h1.get("final_package")
-            }), ex=3600)
+            }
+            redis_service.set(completion_key, json.dumps(serialize_pydantic(completion_result)), ex=3600)
             
             logger.info(f"Phase 4 complete for {thread_id}")
             
@@ -1088,12 +1111,14 @@ async def resume_workflow_background(thread_id: str, user_input: str):
 
         # Store workflow state updates
         state_key = f"workflow_state:{thread_id}"
-        redis_service.set(state_key, json.dumps(result), ex=3600)
+        # Serialize Pydantic models before storing
+        serialized_result = serialize_pydantic(result)
+        redis_service.set(state_key, json.dumps(serialized_result), ex=3600)
 
         # Store result if workflow completed
         if result.get("status") == "phase_complete":
             completion_key = f"workflow_complete:{thread_id}"
-            redis_service.set(completion_key, json.dumps(result), ex=3600)
+            redis_service.set(completion_key, json.dumps(serialized_result), ex=3600)
 
     except Exception as e:
         # Store error
@@ -1128,7 +1153,8 @@ async def process_magic_pencil_edit(thread_id: str, concept_id: int, edit_instru
                 concepts = json.loads(concepts_data)
                 if concept_id < len(concepts["concepts"]):
                     concepts["concepts"][concept_id] = edit_result["updated_concept"]
-                    redis_service.set(concepts_key, json.dumps(concepts), ex=3600)
+                    # Serialize Pydantic models before storing
+                    redis_service.set(concepts_key, json.dumps(serialize_pydantic(concepts)), ex=3600)
 
             # Update edit status
             edit_key = f"magic_pencil:{thread_id}:{concept_id}"
@@ -1140,7 +1166,8 @@ async def process_magic_pencil_edit(thread_id: str, concept_id: int, edit_instru
                 "status": "completed",
                 "result": edit_result
             }
-            redis_service.set(edit_key, json.dumps(edit_data), ex=3600)
+            # Serialize Pydantic models before storing
+            redis_service.set(edit_key, json.dumps(serialize_pydantic(edit_data)), ex=3600)
 
     except Exception as e:
         # Store error
