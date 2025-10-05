@@ -97,6 +97,8 @@ export default function Home() {
   >([]);
   const [pageLoaded, setPageLoaded] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("");
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Fade-in animation on page load
   useEffect(() => {
@@ -204,13 +206,32 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Detect if user has manually scrolled up
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } =
+      messagesContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50; // 50px threshold
+
+    // Only mark as scrolled if user is NOT at bottom
+    if (!isAtBottom) {
+      setUserHasScrolled(true);
+    } else {
+      setUserHasScrolled(false);
+    }
+  };
+
   useEffect(() => {
     // Only auto-scroll after the initial animation is complete (phase 8+)
-    // This prevents the page from scrolling during the chat mode transition
-    if (animationPhase >= 8) {
-      scrollToBottom();
+    // and if user hasn't manually scrolled up
+    if (animationPhase >= 8 && !userHasScrolled) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     }
-  }, [messages, animationPhase]);
+  }, [messages, animationPhase, userHasScrolled]);
 
   // Prevent body scroll during chat mode transition animation
   useEffect(() => {
@@ -610,7 +631,9 @@ export default function Home() {
         >
           {/* Messages Area - Fixed height, no resizing */}
           <div
-            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto"
+            ref={messagesContainerRef}
+            onScroll={handleScroll}
+            className="bg-[#232937] border-[0.5px] border-[#4ade80] p-6 overflow-y-auto chat-scrollbar"
             style={{
               height: "calc(100vh - 280px)",
             }}
@@ -1010,9 +1033,9 @@ export default function Home() {
         }}
       >
         {/* Title */}
-        <div className="overflow-hidden text-center">
+        <div className="overflow-hidden text-center mt-12">
           <h1
-            className="text-5xl text-white mb-2 font-semibold transition-all duration-500 ease-out font-mono"
+            className="text-5xl text-white mb-4 font-semibold transition-all duration-500 ease-out font-mono"
             style={{
               transform:
                 animationPhase >= 2 ? "translateY(-150%)" : "translateY(0)",
@@ -1021,37 +1044,6 @@ export default function Home() {
           >
             What Do You Want To Make?
           </h1>
-          <pre className="text-[#67B68B] text-[8px] leading-[0.6] mb-2 font-mono opacity-60">
-            {`                 ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                               
-             ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
-          ↓↙↙↓↙↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
-        ↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙        ↓↙↙↓↙↙↓↙↓↙↓↙↙                       
-      ↙↓↙↓↙↓↙↓↙↓↙↓↙                  ↓↙↓↙↓↙↓↙↓↓                     
-     ↓↙↓↙↓↙↙↓↙↓↙                        ↙↓↙↓↙↙↙↓↓                   
-   ↙↓↙↓↙↓↙↓↙↓↙                            ↓↙↓↓↙↙↓↙                  
-  ↓↙↓↙↙↓↙↓↙↓↙                               ↙↓↙↓↙↓↙           ↙↓↙↙  
- ↓↙↓↙↓↙↓↙↙↓                                  ↙↓↙↓↙↓↓     ↓↓↙↓↙↙     
- ↙↓↙↓↙↓↙↓↓↙                                   ↙↓↙↓   ↙↓↙↓↙↙         
-↓↙↓↙↙↓↙↓↙↓                                      ↓↙↓↙↓↙↓             
-↓↙↓↙↓↙↓↙↓↙                                 ↙↓↙↓↙↙↓↙↓↓               
-↓↙↓↙↓↙↙↓↙↓↙                    ↙↙↓     ↓↓↙↓↙↓↙↓↙↓↙↓↙↙↓              
-↙↓↙↓↙↓↙↓↙↓↙↓↙↓        ↙↙↓↓↙↓↙↓↓↙    ↙↓↙↙↓↙↓↓↙  ↓↙↓↙↓↙↓              
-↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙↓↙↙↙   ↓↙↓↙↓↙↓↙↓      ↙↓↙↓↙↓↙              
- ↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓     ↓↙↓↙↓↙↓↙↓↙       ↙↓↙↓↙↓↙↓              
-   ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙       ↙↓↙↙↓↙↙↓↙↓↙          ↓↙↓↙↓↙↓               
-                       ↓↙↓↙↓↙↓↙↓↙↓           ↙↓↙↙↓↙↓↙               
-                    ↙↓↙↓↙↓↙↓↙↓↓             ↓↙↓↙↓↙↓↙↓               
-                  ↓↙↓↙↓↙↓↙↓↙↓             ↓↙↙↓↙↓↙↓↙↓                
-                ↓↙↓↙↓↙↙↓↙↓↙             ↙↓↙↓↙↓↙↙↓↙↓                 
-              ↓↙↓↙↙↓↙↓↙↓↙↓            ↓↙↓↙↓↙↓↙↓↙↓↙                  
-             ↙↓↙↙↓↙↓↙↓↙↓↙↙↙      ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                   
-            ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                    
-           ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                     
-           ↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↙                       
-            ↓↙↓↙↓↙↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                         
-              ↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙↓↙                            
-                 ↓↓↙↓↙↓↙↓↙↓↙↙↓↙↓↙↓↙↓`}
-          </pre>
           <h2 className="text-[#67B68B] mb-4 font-mono text-3xl">
             Turn Waste into Products
           </h2>
