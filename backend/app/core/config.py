@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     REPLICATE_API_KEY: Optional[str] = Field(default=os.getenv("REPLICATE_API_KEY", None))
     GEMINI_API_KEY: Optional[str] = Field(default=os.getenv("GEMINI_API_KEY", None))
     
-    # Gemini settings
+    # Gemini settings (USING FLASH FOR ALL OPERATIONS)
     GEMINI_MODEL: str = Field(default=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
     GEMINI_FLASH_MODEL: str = Field(default=os.getenv("GEMINI_FLASH_MODEL", "gemini-2.5-flash"))
     GEMINI_MAX_RETRIES: int = Field(default=int(os.getenv("GEMINI_MAX_RETRIES", "3")))

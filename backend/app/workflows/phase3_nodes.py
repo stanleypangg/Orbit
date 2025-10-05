@@ -311,7 +311,22 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                 variant.image_id = f"hero_{state.thread_id}_{variant.style}_{int(time.time())}"
                 variant.aesthetic_score = 0.95 if image_base64 else 0.5
 
-                # Store image metadata with REAL generated image
+                # OPTIMIZATION: Store image directly to filesystem cache (MUCH faster!)
+                if image_base64:
+                    from pathlib import Path
+                    CACHE_DIR = Path("/tmp/orbit_image_cache")
+                    CACHE_DIR.mkdir(exist_ok=True)
+                    
+                    # Decode and save as WebP (compressed)
+                    image_bytes = base64.b64decode(image_base64)
+                    from PIL import Image as PILImage
+                    img = PILImage.open(BytesIO(image_bytes))
+                    
+                    cache_file = CACHE_DIR / f"{variant.image_id}.webp"
+                    img.save(cache_file, "WEBP", quality=85, optimize=True)
+                    logger.info(f"IMG: ✓ Saved image to filesystem cache: {cache_file}")
+                
+                # Store lightweight metadata in Redis (NO base64!)
                 image_key = f"image:{variant.image_id}"
                 image_metadata = {
                     "thread_id": state.thread_id,
@@ -322,7 +337,8 @@ async def image_generation_node(state: WorkflowState) -> Dict[str, Any]:
                     "quality": "hero",
                     "model": "gemini-2.5-flash-image",
                     "status": "generated" if image_base64 else "placeholder",
-                    "base64_data": image_base64 if image_base64 else None  # Store actual image!
+                    # NO base64_data - stored on filesystem instead!
+                    "cached": True if image_base64 else False
                 }
                 redis_service.set(image_key, json.dumps(image_metadata), ex=7200)
 

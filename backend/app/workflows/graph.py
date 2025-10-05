@@ -304,28 +304,38 @@ class RecycleWorkflowOrchestrator:
                 ingredients_data = load_ingredients_from_redis(thread_id)
                 logger.info(f"Loaded {len(ingredients_data.ingredients) if ingredients_data else 0} ingredients from Redis")
                 
-                # Create new state with user response appended
-                # IMPORTANT: Start from process_clarification node, NOT P1a!
-                continue_state = WorkflowState(
+                # Create state for clarification processing
+                clarification_state = WorkflowState(
                     thread_id=thread_id,
                     user_input=user_response,
                     initial_user_input=prev_result.get("initial_user_input", ""),
                     current_phase=prev_result.get("current_phase", "ingredient_discovery"),
-                    current_node="process_clarification",  # Start from clarification processing
+                    current_node="P1b_null_check",  # Will continue from null check
                     start_time=prev_result.get("start_time", __import__('time').time()),
                     clarification_loop_count=prev_result.get("clarification_loop_count", 0) + 1,
-                    # FIXED: Load from separate Redis key, not from prev_result
                     ingredients_data=ingredients_data if ingredients_data and ingredients_data.ingredients else None,
                     user_questions=prev_result.get("user_questions", []),
                     user_constraints=prev_result.get("user_constraints", {})
                 )
                 
-                logger.info(f"Continuing from process_clarification node with user response: {user_response[:50]}...")
-                logger.info(f"State has {len(continue_state.ingredients_data.ingredients) if continue_state.ingredients_data else 0} ingredients")
+                logger.info(f"Processing clarification with user response: {user_response[:50]}...")
+                logger.info(f"State has {len(clarification_state.ingredients_data.ingredients) if clarification_state.ingredients_data else 0} ingredients")
                 
-                # Run workflow from current point
+                # CRITICAL FIX: Manually process clarification BEFORE continuing workflow
+                # Without checkpointer, we can't resume from specific nodes, so we process clarification here
+                from app.workflows.nodes import process_user_clarification
+                clarification_result = await process_user_clarification(clarification_state)
+                
+                # Update state with processed clarification
+                if clarification_result.get("ingredients_data"):
+                    clarification_state.ingredients_data = clarification_result["ingredients_data"]
+                clarification_state.user_questions = []  # Clear questions after processing
+                
+                logger.info("✅ Clarification processed, continuing workflow from P1a")
+                
+                # Run workflow from beginning - it will skip P1a (ingredients exist) and go to P1b
                 result = await self.compiled_graph.ainvoke(
-                    continue_state.model_dump(),
+                    clarification_state.model_dump(),
                     config=config
                 )
 

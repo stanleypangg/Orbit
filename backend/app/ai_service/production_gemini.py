@@ -147,15 +147,12 @@ class ProductionGeminiClient:
                 metrics.record_gemini_call(self.current_model, "success", duration)
 
     def _should_use_flash(self, task_type: str, prompt_length: int) -> bool:
-        """Determine if Flash model should be used for cost optimization."""
-        # Use Flash for simple, short tasks
-        simple_tasks = ["extraction", "classification", "validation"]
-
-        return (
-            task_type in simple_tasks or
-            prompt_length < 1000 or
-            settings.ENVIRONMENT == "development"
-        )
+        """
+        Determine if Flash model should be used for cost optimization.
+        FORCED TO ALWAYS USE FLASH for speed and cost savings.
+        """
+        # ALWAYS use Flash for all tasks (user preference)
+        return True
 
     async def call_gemini_with_retry(
         self,

@@ -452,7 +452,7 @@ export default function MagicPencilPage() {
 
                 {/* Tool Icons - Animated Peek */}
                 <div className="relative h-20 overflow-hidden -mb-4">
-                  <div className="flex">
+                  <div className="flex -space-x-2">
                     <button
                       onClick={() => setTool("pencil")}
                       disabled={!uploadedImage}

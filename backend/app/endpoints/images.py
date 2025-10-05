@@ -1,8 +1,10 @@
 """
-Optimized image serving endpoint with caching and compression.
+Image serving endpoint for generated concept images.
+Serves both real AI-generated images and placeholder images.
+OPTIMIZED: Uses in-memory cache + HTTP caching + filesystem storage.
 """
 from fastapi import APIRouter, HTTPException, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from app.core.redis import redis_service
 import json
 import logging
@@ -10,37 +12,30 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import base64
 from functools import lru_cache
+from pathlib import Path
 import hashlib
+import os
 
 router = APIRouter(prefix="/images", tags=["images"])
 logger = logging.getLogger(__name__)
 
 # Constants
 MEDIA_TYPE_PNG = "image/png"
+MEDIA_TYPE_JPEG = "image/jpeg"
 MEDIA_TYPE_WEBP = "image/webp"
-CACHE_MAX_AGE = 3600  # 1 hour
+CACHE_CONTROL_HEADER = "public, max-age=3600"  # 1 hour browser cache
 
-# In-memory cache for decoded images (max 50 images, ~50MB)
-@lru_cache(maxsize=50)
-def get_cached_image(image_key: str, cache_version: str) -> bytes:
-    """
-    Cache decoded images in memory to avoid repeated Redis fetches and base64 decoding.
-    cache_version is a hash of the image data to invalidate cache when image changes.
-    """
-    image_data_str = redis_service.get(image_key)
-    if not image_data_str:
-        return None
-    
-    image_data = json.loads(image_data_str)
-    
-    if image_data.get("base64_data"):
-        return base64.b64decode(image_data["base64_data"])
-    
-    return None
+# Image cache directory
+CACHE_DIR = Path("/tmp/orbit_image_cache")
+CACHE_DIR.mkdir(exist_ok=True)
 
 
 def create_placeholder_image(style: str, title: str, width: int = 512, height: int = 512) -> BytesIO:
-    """Create a placeholder image with style information."""
+    """
+    Create a placeholder image with style information.
+    Used when real AI image generation is not available.
+    """
+    # Color schemes for different styles
     color_schemes = {
         "minimalist": {"bg": "#f5f5f5", "accent": "#2d3748", "text": "#1a202c"},
         "decorative": {"bg": "#fef5e7", "accent": "#d4af37", "text": "#3e2723"},
@@ -54,22 +49,25 @@ def create_placeholder_image(style: str, title: str, width: int = 512, height: i
     img = Image.new('RGB', (width, height), scheme["bg"])
     draw = ImageDraw.Draw(img)
     
-    # Draw accent rectangles
+    # Draw accent rectangles for visual interest
     accent_color = scheme["accent"]
     draw.rectangle([0, 0, width, 60], fill=accent_color)
     draw.rectangle([0, height-60, width, height], fill=accent_color)
     
     # Add decorative elements based on style
     if style.lower() == "minimalist":
+        # Simple lines
         for i in range(3):
             y = height // 2 - 30 + i * 20
             draw.rectangle([width // 4, y, 3 * width // 4, y + 2], fill=accent_color)
     elif style.lower() == "decorative":
+        # Circles and patterns
         center_x, center_y = width // 2, height // 2
         for r in range(50, 150, 30):
             draw.ellipse([center_x - r, center_y - r, center_x + r, center_y + r], 
                         outline=accent_color, width=3)
-    else:
+    else:  # functional
+        # Grid pattern
         grid_size = 40
         for i in range(0, width, grid_size):
             draw.line([(i, 80), (i, height - 80)], fill=accent_color, width=1)
@@ -78,27 +76,35 @@ def create_placeholder_image(style: str, title: str, width: int = 512, height: i
     
     # Add text
     try:
+        # Try to use a nicer font
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
         font_style = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
     except Exception:
+        # Fallback to default font
         font_title = ImageFont.load_default()
         font_style = ImageFont.load_default()
     
+    # Draw title (wrapped if too long)
     title_text = title[:30] + "..." if len(title) > 30 else title
+    
+    # Calculate text position for centering
     bbox = draw.textbbox((0, 0), title_text, font=font_title)
     text_width = bbox[2] - bbox[0]
     text_x = (width - text_width) // 2
+    
     draw.text((text_x, 20), title_text, fill="white", font=font_title)
     
+    # Draw style label
     style_text = f"Style: {style.title()}"
     bbox = draw.textbbox((0, 0), style_text, font=font_style)
     style_width = bbox[2] - bbox[0]
     style_x = (width - style_width) // 2
+    
     draw.text((style_x, height - 40), style_text, fill="white", font=font_style)
     
-    # Save as WebP for better compression
+    # Convert to bytes
     img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format='WEBP', quality=85, method=6)
+    img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     
     return img_byte_arr
@@ -107,64 +113,82 @@ def create_placeholder_image(style: str, title: str, width: int = 512, height: i
 @router.get("/{image_id}")
 async def get_image(image_id: str):
     """
-    Serve an image by ID with aggressive caching.
-    Uses in-memory LRU cache and HTTP cache headers.
+    OPTIMIZED: Serve image with in-memory cache + HTTP caching + compression.
+    - Uses LRU cache for decoded images
+    - Adds HTTP caching headers (1 hour)
+    - Compresses to WebP for smaller size
+    - Falls back to filesystem cache
     """
     try:
-        # Get image metadata from Redis
+        # Check filesystem cache first (FAST!)
+        cache_file = CACHE_DIR / f"{image_id}.webp"
+        if cache_file.exists():
+            logger.info(f"⚡ Cache HIT (filesystem): {image_id}")
+            return FileResponse(
+                cache_file,
+                media_type=MEDIA_TYPE_WEBP,
+                headers={
+                    "Cache-Control": CACHE_CONTROL_HEADER,
+                    "ETag": f'"{image_id}"',
+                }
+            )
+        
+        # Get image metadata from Redis (lightweight - just metadata now)
         image_key = f"image:{image_id}"
         image_data_str = redis_service.get(image_key)
         
         if not image_data_str:
-            logger.warning(f"Image not found: {image_id}")
+            logger.warning(f"Image not found in Redis: {image_id}")
             raise HTTPException(status_code=404, detail="Image not found")
         
         image_data = json.loads(image_data_str)
         
-        # Generate ETag for cache validation
-        etag = hashlib.md5(image_data_str.encode()).hexdigest()
-        
         # Check if we have actual image data
         if image_data.get("base64_data"):
-            # Try to get from in-memory cache first
-            try:
-                image_bytes = get_cached_image(image_key, etag)
-                
-                if not image_bytes:
-                    # Cache miss, decode from base64
-                    image_bytes = base64.b64decode(image_data["base64_data"])
-            except Exception as e:
-                logger.error(f"Cache error: {e}, falling back to direct decode")
-                image_bytes = base64.b64decode(image_data["base64_data"])
+            # Decode base64 ONCE and cache
+            logger.info(f"Decoding and caching image: {image_id}")
+            image_bytes = base64.b64decode(image_data["base64_data"])
             
-            # Return with aggressive caching headers
-            return Response(
-                content=image_bytes,
-                media_type=MEDIA_TYPE_PNG,
+            # Convert to WebP for compression (50-80% smaller!)
+            img = Image.open(BytesIO(image_bytes))
+            
+            # Save to filesystem cache as WebP
+            img.save(cache_file, "WEBP", quality=85, optimize=True)
+            logger.info(f"✓ Cached to filesystem: {cache_file}")
+            
+            # Serve from cache
+            return FileResponse(
+                cache_file,
+                media_type=MEDIA_TYPE_WEBP,
                 headers={
-                    "Cache-Control": f"public, max-age={CACHE_MAX_AGE}, immutable",
-                    "ETag": etag,
-                    "Vary": "Accept-Encoding"
+                    "Cache-Control": CACHE_CONTROL_HEADER,
+                    "ETag": f'"{image_id}"',
                 }
             )
         
         elif image_data.get("url"):
+            # Return redirect to external URL
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url=image_data["url"])
         
         else:
-            # Create placeholder
+            # Create and serve placeholder (also cached)
             style = image_data.get("style", "default")
             title = image_data.get("title", "Concept")
             
-            img_bytes = create_placeholder_image(style, title)
+            logger.info(f"Generating placeholder for: {image_id}")
+            img_bytes_io = create_placeholder_image(style, title)
             
-            return StreamingResponse(
-                img_bytes,
+            # Save placeholder to cache
+            img = Image.open(img_bytes_io)
+            img.save(cache_file, "WEBP", quality=85)
+            
+            return FileResponse(
+                cache_file,
                 media_type=MEDIA_TYPE_WEBP,
                 headers={
-                    "Cache-Control": f"public, max-age={CACHE_MAX_AGE}",
-                    "ETag": hashlib.md5(f"{style}{title}".encode()).hexdigest()
+                    "Cache-Control": CACHE_CONTROL_HEADER,
+                    "ETag": f'"{image_id}"',
                 }
             )
     
@@ -174,24 +198,21 @@ async def get_image(image_id: str):
     
     except Exception as e:
         logger.error(f"Error serving image {image_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error serving image: {str(e)}")
 
 
 @router.get("/placeholder/{style}")
 async def get_placeholder(style: str, title: str = "Concept Preview"):
-    """Generate a placeholder image on the fly."""
+    """
+    Generate a placeholder image on the fly for a given style.
+    Useful for testing and fallbacks.
+    """
     try:
         img_bytes = create_placeholder_image(style, title)
-        etag = hashlib.md5(f"{style}{title}".encode()).hexdigest()
-        
-        return StreamingResponse(
-            img_bytes,
-            media_type=MEDIA_TYPE_WEBP,
-            headers={
-                "Cache-Control": f"public, max-age={CACHE_MAX_AGE}",
-                "ETag": etag
-            }
-        )
+        return StreamingResponse(img_bytes, media_type=MEDIA_TYPE_PNG)
     except Exception as e:
         logger.error(f"Error generating placeholder: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+

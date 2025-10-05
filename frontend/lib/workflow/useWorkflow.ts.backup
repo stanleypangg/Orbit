@@ -48,6 +48,7 @@ interface WorkflowState {
 interface UseWorkflowOptions {
   apiUrl?: string;
   onPhaseChange?: (phase: string) => void;
+  initialThreadId?: string; // Resume existing workflow from URL
 }
 
 interface UseWorkflowReturn {
@@ -66,10 +67,11 @@ interface UseWorkflowReturn {
 export function useWorkflow({
   apiUrl = 'http://localhost:8000',
   onPhaseChange,
+  initialThreadId,
 }: UseWorkflowOptions = {}): UseWorkflowReturn {
   const [state, setState] = useState<WorkflowState>({
     phase: 'idle',
-    threadId: null,
+    threadId: initialThreadId || null, // Resume from URL if present
     currentNode: null,
     ingredients: [],
     question: null,
@@ -88,6 +90,7 @@ export function useWorkflow({
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const hasConnectedRef = useRef(false);
 
   const disconnect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -292,15 +295,78 @@ export function useWorkflow({
     };
 
     eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      setState(prev => ({
-        ...prev,
-        error: 'Connection error',
-        phase: 'error',
-      }));
+      console.error('SSE connection error for thread:', threadId);
+      
+      // Check if this was during auto-resume with invalid thread
+      if (initialThreadId && threadId === initialThreadId) {
+        console.warn('Failed to resume workflow - thread may have expired');
+        // Clear invalid thread from URL
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('thread');
+          window.history.replaceState({}, '', url);
+        }
+        setState(prev => ({
+          ...prev,
+          threadId: null,
+          error: null,
+          phase: 'idle',
+          isLoading: false,
+          loadingMessage: null,
+        }));
+      } else {
+        setState(prev => ({
+          ...prev,
+          error: 'Connection error. Please try starting a new workflow.',
+          phase: 'error',
+          isLoading: false,
+        }));
+      }
       disconnect();
     };
   }, [apiUrl, disconnect, onPhaseChange]);
+
+  // Auto-resume workflow if initialThreadId is provided from URL
+  useEffect(() => {
+    if (initialThreadId && !hasConnectedRef.current) {
+      hasConnectedRef.current = true;
+      console.log('Auto-resuming workflow from URL:', initialThreadId);
+      
+      // First check if thread exists before connecting to stream
+      fetch(`${apiUrl}/workflow/status/${initialThreadId}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Workflow not found or expired');
+          }
+          return response.json();
+        })
+        .then(() => {
+          setState(prev => ({
+            ...prev,
+            phase: 'ingredient_discovery',
+            isLoading: true,
+            loadingMessage: '🔄 Resuming workflow...',
+          }));
+          connectToStream(initialThreadId);
+        })
+        .catch((error) => {
+          console.warn('Failed to resume workflow:', error.message);
+          // Clear invalid thread from URL
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('thread');
+            window.history.replaceState({}, '', url);
+          }
+          setState(prev => ({
+            ...prev,
+            threadId: null,
+            phase: 'idle',
+            isLoading: false,
+            loadingMessage: null,
+          }));
+        });
+    }
+  }, [initialThreadId, connectToStream, apiUrl]);
 
   const startWorkflow = useCallback(async (userInput: string) => {
     setState(prev => ({
@@ -332,6 +398,13 @@ export function useWorkflow({
         isLoading: true,
         loadingMessage: '🔍 Analyzing your materials...',
       }));
+      
+      // Update URL with thread ID for resumability
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('thread', threadId);
+        window.history.pushState({}, '', url);
+      }
 
       // Connect to SSE stream
       connectToStream(threadId);
