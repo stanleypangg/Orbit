@@ -389,14 +389,12 @@ export default function ProductDetail() {
 
         {/* Top Section: Model Viewer + ESG Impact Split */}
         <div className="grid grid-cols-[7fr_5fr] gap-6 mb-8">
-          {/* 3D Model Viewer - Square */}
-          <div className="aspect-square">
+          {/* 3D Model Viewer */}
           <ModelViewer
             modelUrl={modelUrl}
             isLoading={isGenerating}
             error={error}
           />
-          </div>
           
           {/* ESG Impact Stats Screen - Video Game Aesthetic */}
           <div className="flex flex-col gap-6">
